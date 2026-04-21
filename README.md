@@ -61,6 +61,19 @@ Loaded from `~/.config/last30days-crypto/.env` (separate from the vanilla `/last
 
 See [CRYPTO_SPEC.md](CRYPTO_SPEC.md) for the full implementation plan and [CLAUDE.md](CLAUDE.md) for the dev cheatsheet.
 
-## Open source
+## Credits
 
-MIT license. Same as upstream. Built on Python 3.12+, the vendored Bird X-search client (Node.js, MIT), and the four crypto APIs above.
+This skill is a **hard fork of [`mvanhorn/last30days-skill`](https://github.com/mvanhorn/last30days-skill) by Matt Van Horn**, rewired and re-scoped for crypto research. The original skill — multi-source research across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and more — is the foundation this work is built on.
+
+The crypto fork keeps the original's pipeline architecture, planner-driven query expansion, ranking/clustering, and rendering core. It strips the non-crypto-relevant sources, swaps in three crypto data APIs (CoinGecko, Messari, LunarCrush) plus Firecrawl, makes Twitter/X the primary qualitative source, and adds a token-extraction pass that triggers automatic per-token enrichment.
+
+Huge thanks to Matt for the original work and for making it open source. If you want general-purpose research across many platforms, install [his skill](https://github.com/mvanhorn/last30days-skill) too — they're designed to coexist.
+
+Also built on:
+- The vendored [Bird](https://github.com/steipete/bird) X-search client by Peter Steinberger (MIT, Node.js).
+- CoinGecko, Messari, LunarCrush, and Firecrawl APIs.
+- Python 3.12+, stdlib-first.
+
+## License
+
+MIT, same as upstream.
