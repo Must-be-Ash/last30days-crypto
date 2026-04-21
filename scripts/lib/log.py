@@ -1,4 +1,4 @@
-"""Shared logging utilities for last30days skill."""
+"""Shared logging utilities for last30days-crypto skill."""
 
 import os
 import sys

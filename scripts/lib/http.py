@@ -1,4 +1,4 @@
-"""HTTP utilities for last30days skill (stdlib only)."""
+"""HTTP utilities for last30days-crypto skill (stdlib only)."""
 
 import json
 import re
@@ -22,7 +22,7 @@ def log(msg: str):
 MAX_RETRIES = 5
 MAX_429_RETRIES = 2
 RETRY_DELAY = 2.0
-USER_AGENT = "last30days-skill/3.0 (Assistant Skill)"
+USER_AGENT = "last30days-crypto/3.0 (Assistant Skill)"
 
 
 class HTTPError(Exception):

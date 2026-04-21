@@ -1,4 +1,4 @@
-"""Browser cookie extraction for last30days.
+"""Browser cookie extraction for last30days-crypto.
 
 Extracts cookies from local browser databases (Firefox, Chrome, Safari)
 to enable zero-config authentication for services like X/Twitter.

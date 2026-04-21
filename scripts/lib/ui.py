@@ -1,4 +1,4 @@
-"""Terminal UI utilities for last30days skill."""
+"""Terminal UI utilities for last30days-crypto skill."""
 
 import sys
 import time
@@ -32,7 +32,7 @@ BANNER = f"""{Colors.PURPLE}{Colors.BOLD}
 {Colors.RESET}{Colors.DIM}  30 days of research. 30 seconds of work.{Colors.RESET}
 """
 
-MINI_BANNER = f"""{Colors.PURPLE}{Colors.BOLD}/last30days{Colors.RESET} {Colors.DIM}· researching...{Colors.RESET}"""
+MINI_BANNER = f"""{Colors.PURPLE}{Colors.BOLD}/last30days-crypto{Colors.RESET} {Colors.DIM}· researching...{Colors.RESET}"""
 
 # Fun status messages for each phase
 REDDIT_MESSAGES = [
@@ -206,7 +206,7 @@ BIRD_AUTH_HELP = f"""
 {Colors.YELLOW}Bird authentication failed.{Colors.RESET}
 
 To fix this:
-1. Add AUTH_TOKEN and CT0 to ~/.config/last30days/.env or .claude/last30days.env
+1. Add AUTH_TOKEN and CT0 to ~/.config/last30days-crypto/.env or .claude/last30days-crypto.env
 2. Or set XAI_API_KEY for the xAI fallback backend
 """
 
@@ -214,7 +214,7 @@ BIRD_AUTH_HELP_PLAIN = """
 Bird authentication failed.
 
 To fix this:
-1. Add AUTH_TOKEN and CT0 to ~/.config/last30days/.env or .claude/last30days.env
+1. Add AUTH_TOKEN and CT0 to ~/.config/last30days-crypto/.env or .claude/last30days-crypto.env
 2. Or set XAI_API_KEY for the xAI fallback backend
 """
 
@@ -292,7 +292,7 @@ class ProgressDisplay:
             sys.stderr.write(f"{Colors.DIM}Topic: {Colors.RESET}{Colors.BOLD}{self.topic}{Colors.RESET}\n\n")
         else:
             # Simple text for non-TTY
-            sys.stderr.write(f"/last30days · researching: {self.topic}\n")
+            sys.stderr.write(f"/last30days-crypto · researching: {self.topic}\n")
         sys.stderr.flush()
 
     def start_reddit(self):
@@ -491,105 +491,66 @@ def show_diagnostic_banner(diag: dict):
     """
     available_sources = set(diag.get("available_sources") or [])
     has_reddit = "reddit" in available_sources
-    has_scrapecreators = diag.get("has_scrapecreators", False)
     has_x = "x" in available_sources
-    has_youtube = "youtube" in available_sources
     has_web = "grounding" in available_sources
-    has_xiaohongshu = "xiaohongshu" in available_sources
+    has_hn = "hackernews" in available_sources
+    has_cg = "coingecko" in available_sources
+    has_msr = "messari" in available_sources
+    has_lc = "lunarcrush" in available_sources
     x_backend = diag.get("x_backend")
     native_web_backend = diag.get("native_web_backend")
 
-    # If everything is available, no banner needed
-    if has_reddit and has_x and has_youtube and has_web:
+    # If the core crypto pipeline is fully wired, no banner needed.
+    if has_x and has_web and has_cg and has_msr and has_lc:
         return
 
-    lines = []
+    def _row(emoji_color: str, emoji: str, name: str, detail: str) -> str:
+        if IS_TTY:
+            return f"{Colors.DIM}│{Colors.RESET}  {emoji_color}{emoji} {name:<12}{Colors.RESET} — {detail}"
+        return f"│  {emoji} {name:<12} — {detail}"
 
+    lines = []
+    header = "/last30days-crypto v3.0.0 — Source Status"
     if IS_TTY:
         lines.append(f"{Colors.DIM}┌─────────────────────────────────────────────────────┐{Colors.RESET}")
-        lines.append(f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}/last30days v3.0.0 - Source Status{Colors.RESET}                 {Colors.DIM}│{Colors.RESET}")
-        lines.append(f"{Colors.DIM}│{Colors.RESET}                                                     {Colors.DIM}│{Colors.RESET}")
+        lines.append(f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}{header}{Colors.RESET}")
+        lines.append(f"{Colors.DIM}│{Colors.RESET}")
+    else:
+        lines.append("┌─────────────────────────────────────────────────────┐")
+        lines.append(f"│ {header}")
+        lines.append("│")
 
-        # Reddit
-        if has_reddit and has_scrapecreators:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ Reddit{Colors.RESET}    — full threads with comments          {Colors.DIM}│{Colors.RESET}")
-        elif has_reddit:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ Reddit{Colors.RESET}    — public threads (titles + scores)   {Colors.DIM}│{Colors.RESET}")
-        else:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.RED}❌ Reddit{Colors.RESET}    — unavailable                         {Colors.DIM}│{Colors.RESET}")
+    # X (primary)
+    if has_x:
+        username = diag.get("bird_username", "")
+        label = f"Bird ({username})" if x_backend == "bird" and username else str(x_backend or "xai").upper()
+        lines.append(_row(Colors.GREEN, "✅", "X/Twitter", label))
+    else:
+        lines.append(_row(Colors.RED, "❌", "X/Twitter", "Add AUTH_TOKEN + CT0 (X cookies) or XAI_API_KEY"))
 
-        # X/Twitter
-        if has_x:
-            username = diag.get("bird_username", "")
-            label = f"Bird ({username})" if x_backend == "bird" and username else str(x_backend or "xai").upper()
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ X/Twitter{Colors.RESET} — {label}                          {Colors.DIM}│{Colors.RESET}")
-        else:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.RED}❌ X/Twitter{Colors.RESET} — No X auth or fallback key        {Colors.DIM}│{Colors.RESET}")
-            if diag.get("bird_installed"):
-                lines.append(f"{Colors.DIM}│{Colors.RESET}     └─ Add AUTH_TOKEN/CT0 or XAI_API_KEY      {Colors.DIM}│{Colors.RESET}")
-            else:
-                lines.append(f"{Colors.DIM}│{Colors.RESET}     └─ Needs Node.js 22+ (Bird is bundled)           {Colors.DIM}│{Colors.RESET}")
+    # Web (secondary)
+    if has_web:
+        backend = native_web_backend or "native"
+        lines.append(_row(Colors.GREEN, "✅", "Web", f"{backend} API"))
+    else:
+        lines.append(_row(Colors.YELLOW, "⚡", "Web", "Add SERPER_API_KEY or EXA_API_KEY"))
 
-        # YouTube
-        if has_youtube:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ YouTube{Colors.RESET}   — yt-dlp found                      {Colors.DIM}│{Colors.RESET}")
-        else:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.RED}❌ YouTube{Colors.RESET}   — yt-dlp not installed                {Colors.DIM}│{Colors.RESET}")
-            lines.append(f"{Colors.DIM}│{Colors.RESET}     └─ Fix: brew install yt-dlp (free)                {Colors.DIM}│{Colors.RESET}")
+    # Reddit + HN (tertiary)
+    lines.append(_row(Colors.GREEN if has_reddit else Colors.RED, "✅" if has_reddit else "❌", "Reddit", "public threads" if has_reddit else "unavailable"))
+    lines.append(_row(Colors.GREEN if has_hn else Colors.RED, "✅" if has_hn else "❌", "HackerNews", "Algolia API" if has_hn else "unavailable"))
 
-        # Xiaohongshu (only show when configured)
-        if has_xiaohongshu:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ Xiaohongshu{Colors.RESET} — API connected + logged in         {Colors.DIM}│{Colors.RESET}")
+    # Crypto enrichment
+    lines.append(_row(Colors.GREEN if has_cg else Colors.YELLOW, "✅" if has_cg else "⚡", "CoinGecko", "Pro API" if has_cg else "Add COINGECKO_API_KEY"))
+    lines.append(_row(Colors.GREEN if has_msr else Colors.YELLOW, "✅" if has_msr else "⚡", "Messari", "API key" if has_msr else "Add MESSARI_API_KEY"))
+    lines.append(_row(Colors.GREEN if has_lc else Colors.YELLOW, "✅" if has_lc else "⚡", "LunarCrush", "API key" if has_lc else "Add LUNARCRUSH_API_KEY"))
 
-        # Web
-        if has_web:
-            backend = native_web_backend or "native"
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.GREEN}✅ Web{Colors.RESET}       — {backend} API                       {Colors.DIM}│{Colors.RESET}")
-        else:
-            lines.append(f"{Colors.DIM}│{Colors.RESET}  {Colors.YELLOW}⚡ Web{Colors.RESET}       — Add BRAVE_API_KEY or SERPER_API_KEY {Colors.DIM}│{Colors.RESET}")
-
-        lines.append(f"{Colors.DIM}│{Colors.RESET}                                                     {Colors.DIM}│{Colors.RESET}")
-        lines.append(f"{Colors.DIM}│{Colors.RESET}  Config: {Colors.BOLD}~/.config/last30days/.env{Colors.RESET}                  {Colors.DIM}│{Colors.RESET}")
+    if IS_TTY:
+        lines.append(f"{Colors.DIM}│{Colors.RESET}")
+        lines.append(f"{Colors.DIM}│{Colors.RESET}  Config: {Colors.BOLD}~/.config/last30days-crypto/.env{Colors.RESET}")
         lines.append(f"{Colors.DIM}└─────────────────────────────────────────────────────┘{Colors.RESET}")
     else:
-        # Plain text for non-TTY (Claude Code / Codex)
-        lines.append("┌─────────────────────────────────────────────────────┐")
-        lines.append("│ /last30days v3.0.0 - Source Status                 │")
-        lines.append("│                                                     │")
-
-        if has_reddit and has_scrapecreators:
-            lines.append("│  ✅ Reddit    — full threads with comments          │")
-        elif has_reddit:
-            lines.append("│  ✅ Reddit    — public threads (titles + scores)   │")
-        else:
-            lines.append("│  ❌ Reddit    — unavailable                         │")
-
-        if has_x:
-            lines.append("│  ✅ X/Twitter — available                            │")
-        else:
-            lines.append("│  ❌ X/Twitter — No X auth or fallback key          │")
-            if diag.get("bird_installed"):
-                lines.append("│     └─ Add AUTH_TOKEN/CT0 or XAI_API_KEY           │")
-            else:
-                lines.append("│     └─ Needs Node.js 22+ (Bird is bundled)           │")
-
-        if has_youtube:
-            lines.append("│  ✅ YouTube   — yt-dlp found                        │")
-        else:
-            lines.append("│  ❌ YouTube   — yt-dlp not installed                │")
-            lines.append("│     └─ Fix: brew install yt-dlp (free)                │")
-
-        if has_xiaohongshu:
-            lines.append("│  ✅ Xiaohongshu — API connected + logged in         │")
-
-        if has_web:
-            backend = native_web_backend or "native"
-            lines.append(f"│  ✅ Web       — {backend} API available{' ' * max(0, 13 - len(backend))}│")
-        else:
-            lines.append("│  ⚡ Web       — Add BRAVE_API_KEY or SERPER_API_KEY │")
-
-        lines.append("│                                                     │")
-        lines.append("│  Config: ~/.config/last30days/.env                  │")
+        lines.append("│")
+        lines.append("│  Config: ~/.config/last30days-crypto/.env")
         lines.append("└─────────────────────────────────────────────────────┘")
 
     sys.stderr.write("\n".join(lines) + "\n\n")

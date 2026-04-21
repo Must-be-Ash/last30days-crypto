@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ruff: noqa: E402
-"""last30days v3.0.0 CLI."""
+"""last30days-crypto v3.0.0 CLI."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def ensure_supported_python(version_info: tuple[int, int, int] | object | None =
     if (major, minor) >= MIN_PYTHON:
         return
     sys.stderr.write(
-        "last30days v3 requires Python 3.12+.\n"
+        "last30days-crypto v3 requires Python 3.12+.\n"
         f"Detected Python {major}.{minor}.{micro}.\n"
         "Install and use python3.12 or python3.13, then rerun this command.\n"
     )
@@ -90,7 +90,7 @@ def parse_search_flag(raw: str) -> list[str]:
 
 def slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or "last30days"
+    return slug or "last30days-crypto"
 
 
 def save_output(report: schema.Report, emit: str, save_dir: str, suffix: str = "") -> Path:
@@ -376,7 +376,7 @@ def main() -> int:
     if args.store:
         counts = persist_report(report)
         sys.stderr.write(
-            f"[last30days] Stored {counts['new']} new, {counts['updated']} updated findings\n"
+            f"[last30days-crypto] Stored {counts['new']} new, {counts['updated']} updated findings\n"
         )
         sys.stderr.flush()
 
@@ -394,7 +394,7 @@ def main() -> int:
     rendered = emit_output(report, args.emit, fun_level=fun_level)
     if args.save_dir:
         save_path = save_output(report, args.emit, args.save_dir, suffix=args.save_suffix or "")
-        sys.stderr.write(f"[last30days] Saved output to {save_path}\n")
+        sys.stderr.write(f"[last30days-crypto] Saved output to {save_path}\n")
         sys.stderr.flush()
     print(rendered)
     return 0

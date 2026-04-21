@@ -56,7 +56,7 @@ metadata:
 
 # last30days-crypto v3.0.0: Crypto-Focused Research from the Last 30 Days
 
-> **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `~/Documents/Last30Days/`. X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Crypto data uses optional API keys (COINGECKO_API_KEY, MESSARI_API_KEY, LUNARCRUSH_API_KEY, FIRECRAWL_API_KEY). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
+> **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `~/Documents/Last30Days-Crypto/`. X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Crypto data uses optional API keys (COINGECKO_API_KEY, MESSARI_API_KEY, LUNARCRUSH_API_KEY, FIRECRAWL_API_KEY). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
 
 Crypto-focused research across Twitter/X (primary), web search, and three crypto data APIs (CoinGecko, Messari, LunarCrush). Surface what crypto Twitter is actually discussing, what the on-chain and derivatives signals say, and what the social-quant indicators (Galaxy Score, AltRank, sentiment) reveal — all in one report.
 
@@ -82,7 +82,7 @@ fi
 
 **CRITICAL: ALWAYS execute Step 0 BEFORE Step 1, even if the user provided a topic.** If the user typed `/last30days-crypto $HYPE`, you MUST check for FIRST_RUN and present the wizard BEFORE running research. The topic "$HYPE" is preserved — research runs immediately after the wizard completes. Do NOT skip the wizard because a topic was provided. The wizard takes 10 seconds and only runs once ever.
 
-To detect first run: check if `~/.config/last30days/.env` exists. If it does NOT exist, this is a first run. **Do NOT run any Bash commands or show any command output to detect this — just check the file existence silently.** If the file exists and contains `SETUP_COMPLETE=true`, skip this section **silently** and proceed to Step 1. **Do NOT say "Setup is complete" or any other status message — just move on.** The user doesn't need to be told setup is done every time they run the skill.
+To detect first run: check if `~/.config/last30days-crypto/.env` exists. If it does NOT exist, this is a first run. **Do NOT run any Bash commands or show any command output to detect this — just check the file existence silently.** If the file exists and contains `SETUP_COMPLETE=true`, skip this section **silently** and proceed to Step 1. **Do NOT say "Setup is complete" or any other status message — just move on.** The user doesn't need to be told setup is done every time they run the skill.
 
 **When first run is detected, detect your platform first:**
 
@@ -163,7 +163,7 @@ Options:
 
 **Before running the setup command, get cookie consent:**
 
-Check if `BROWSER_CONSENT=true` already exists in `~/.config/last30days/.env`. If it does, skip the consent prompt and run setup directly.
+Check if `BROWSER_CONSENT=true` already exists in `~/.config/last30days-crypto/.env`. If it does, skip the consent prompt and run setup directly.
 
 If `BROWSER_CONSENT=true` is NOT present, **call AskUserQuestion:**
 Question: "Auto setup will scan your browser for x.com cookies to authenticate X search. Cookies are read live, not saved to disk. Chrome on macOS will prompt for Keychain access. OK to proceed?"
@@ -185,7 +185,7 @@ Crypto research benefits enormously from market, on-chain, and social-quant data
 **Call AskUserQuestion:**
 Question: "Want to add the crypto data APIs? (CoinGecko / Messari / LunarCrush — all free tier.)"
 Options:
-- "I have keys to paste" — Accept the three keys (any subset; ask one by one). Write `COINGECKO_API_KEY={k}`, `MESSARI_API_KEY={k}`, `LUNARCRUSH_API_KEY={k}` to `~/.config/last30days/.env`. Confirm what was added.
+- "I have keys to paste" — Accept the three keys (any subset; ask one by one). Write `COINGECKO_API_KEY={k}`, `MESSARI_API_KEY={k}`, `LUNARCRUSH_API_KEY={k}` to `~/.config/last30days-crypto/.env`. Confirm what was added.
 - "Open all three signup pages" — Run `open https://www.coingecko.com/en/api/pricing` and `open https://messari.io/api` and `open https://lunarcrush.com/developers` via Bash. Tell user to paste keys when ready.
 - "Skip for now — I'll add them later" — proceed without crypto data. Note: research without these keys will still run on X/web but skip the Market & On-chain section.
 
@@ -218,7 +218,7 @@ Show them this guide (present as plain text, not blockquoted):
 
 The magic of /last30days-crypto is X/Twitter posts + crypto data APIs together. Here's how to unlock each source.
 
-Add these to `~/.config/last30days/.env`:
+Add these to `~/.config/last30days-crypto/.env`:
 
 X/Twitter (pick one — this is the primary source):
 - `AUTH_TOKEN=xxx` + `CT0=xxx` — paste your X cookies manually (x.com -> F12 -> Application -> Cookies). Recommended for the best signal.
@@ -251,11 +251,11 @@ Reddit (free, works out of the box):
 
 Always add this last line: `SETUP_COMPLETE=true`
 
-**CRITICAL: NEVER overwrite an existing .env file.** Before writing ANY key to `~/.config/last30days/.env`:
-1. Check if the file exists: `test -f ~/.config/last30days/.env`
+**CRITICAL: NEVER overwrite an existing .env file.** Before writing ANY key to `~/.config/last30days-crypto/.env`:
+1. Check if the file exists: `test -f ~/.config/last30days-crypto/.env`
 2. If it exists, READ it first, then APPEND only missing keys using `>>` (double redirect)
 3. NEVER use `>` (single redirect) which destroys existing content
-4. If it doesn't exist, create it: `mkdir -p ~/.config/last30days && touch ~/.config/last30days/.env`
+4. If it doesn't exist, create it: `mkdir -p ~/.config/last30days-crypto && touch ~/.config/last30days-crypto/.env`
 
 **Then call AskUserQuestion:**
 Question: "How do you want to add your keys?"
@@ -265,7 +265,7 @@ Options:
 - "I'll do it myself" - I'll tell you the file path and you handle it.
 
 **If the user picks "Open .env in editor":**
-Create `~/.config/last30days/.env` if it doesn't exist (check first!), pre-populated with this template:
+Create `~/.config/last30days-crypto/.env` if it doesn't exist (check first!), pre-populated with this template:
 ```
 # /last30days-crypto configuration
 # Uncomment and fill in the keys you want to use.
@@ -298,12 +298,12 @@ Create `~/.config/last30days/.env` if it doesn't exist (check first!), pre-popul
 SETUP_COMPLETE=true
 ```
 If the file already exists, do NOT overwrite it. Just open it.
-Run `open ~/.config/last30days/.env` on macOS to open in the default editor.
+Run `open ~/.config/last30days-crypto/.env` on macOS to open in the default editor.
 Then tell the user: "Your .env is open. Edit it, save, and run /last30days-crypto again."
 
-**If the user picks "Paste keys here"**, write them to `~/.config/last30days/.env` (create the file and parent dirs if needed, append without overwriting existing keys, always include `SETUP_COMPLETE=true`). If any of `COINGECKO_API_KEY`/`MESSARI_API_KEY`/`LUNARCRUSH_API_KEY` are included, confirm: "Crypto data APIs are now on. The Market & On-chain section will appear in every research run that mentions a token." Then proceed with research.
+**If the user picks "Paste keys here"**, write them to `~/.config/last30days-crypto/.env` (create the file and parent dirs if needed, append without overwriting existing keys, always include `SETUP_COMPLETE=true`). If any of `COINGECKO_API_KEY`/`MESSARI_API_KEY`/`LUNARCRUSH_API_KEY` are included, confirm: "Crypto data APIs are now on. The Market & On-chain section will appear in every research run that mentions a token." Then proceed with research.
 
-**If the user picks "I'll do it myself"**, tell them: "Save the file at `~/.config/last30days/.env`, then run `/last30days-crypto <topic>` to research anything." Then proceed with research using whatever sources are currently available.
+**If the user picks "I'll do it myself"**, tell them: "Save the file at `~/.config/last30days-crypto/.env`, then run `/last30days-crypto <topic>` to research anything." Then proceed with research using whatever sources are currently available.
 
 **If the user picks Skip:**
 Proceed with research immediately using the user's original topic. Do NOT create or modify the .env file when the user picks Skip. Note: without setup, sources are limited to HN, GitHub (if `gh` CLI installed), Reddit, and Web (if any web key is already set). X/Twitter and crypto-data APIs require setup.
@@ -520,7 +520,7 @@ If `--agent` appears in ARGUMENTS (e.g., `/last30days-crypto $HYPE momentum --ag
 5. **Skip** the follow-up invitation ("I'm now an expert on X...")
 6. **Output** the complete research report and stop - do not wait for further input
 
-Agent mode saves raw research data to `~/Documents/Last30Days/` automatically via `--save-dir` (handled by the script, no extra tool calls).
+Agent mode saves raw research data to `~/Documents/Last30Days-Crypto/` automatically via `--save-dir` (handled by the script, no extra tool calls).
 
 Agent mode report format:
 
@@ -548,7 +548,7 @@ When the user asks "X vs Y", run ONE research pass with a comparison-optimized p
 
 **Single pass with entity-aware subqueries:**
 ```bash
-"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" "{TOPIC_A} vs {TOPIC_B}" --emit=compact --save-dir=~/Documents/Last30Days --save-suffix=v3 --plan 'COMPARISON_PLAN_JSON' --x-handle={TOPIC_A_HANDLE} --x-related={TOPIC_B_HANDLE},{COMPANY_A_HANDLE},{COMPANY_B_HANDLE},{COMMENTATOR_HANDLES} --subreddits={RESOLVED_SUBREDDITS} --tiktok-hashtags={RESOLVED_HASHTAGS} --tiktok-creators={RESOLVED_TIKTOK_CREATORS} --ig-creators={RESOLVED_IG_CREATORS}
+"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" "{TOPIC_A} vs {TOPIC_B}" --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3 --plan 'COMPARISON_PLAN_JSON' --x-handle={TOPIC_A_HANDLE} --x-related={TOPIC_B_HANDLE},{COMPANY_A_HANDLE},{COMPANY_B_HANDLE},{COMMENTATOR_HANDLES} --subreddits={RESOLVED_SUBREDDITS} --tiktok-hashtags={RESOLVED_HASHTAGS} --tiktok-creators={RESOLVED_TIKTOK_CREATORS} --ig-creators={RESOLVED_IG_CREATORS}
 ```
 
 **The `--plan` JSON for comparisons should include 3-4 subqueries:**
@@ -736,7 +736,7 @@ if [ -z "${SKILL_ROOT:-}" ]; then
   exit 1
 fi
 
-"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" $ARGUMENTS --emit=compact --save-dir=~/Documents/Last30Days --save-suffix=v3
+"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" $ARGUMENTS --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3
 ```
 
 **If you ran Steps 0.55 and 0.75 (agent planning), add these flags:**
@@ -822,7 +822,7 @@ For ALL query types:
 After completing the WebSearch supplementals above, append the results to the saved raw file so it becomes the complete debug artifact (Python engine data + WebSearch data).
 
 **Instructions:**
-1. Read the raw file at `~/Documents/Last30Days/{slug}-raw-nogem.md` (it was saved by the Python engine in Step 1).
+1. Read the raw file at `~/Documents/Last30Days-Crypto/{slug}-raw-nogem.md` (it was saved by the Python engine in Step 1).
 2. Append a `## WebSearch Supplemental Results` section at the end.
 3. For each WebSearch result, include the URL and a 1-2 sentence excerpt of what you found.
 4. Write the updated file back.
@@ -1136,7 +1136,7 @@ Options:
 ├─ 📊 Polymarket: {N} markets │ {copy the market odds EXACTLY from the engine's Polymarket stats output - only real % numbers like "Arizona 33%, Michigan 25%". If you cannot find specific % odds in the data, show ONLY the market count with no description. NEVER write filler like "check markets", "active", "tracked", or any text without a real percentage.}
 ├─ 🌐 Web: {N} pages — Source Name, Source Name, Source Name
 ├─ 🗣️ Top voices: @{handle1} ({N} likes), @{handle2} │ r/{sub1}, r/{sub2}
-└─ 📎 Raw results saved to ~/Documents/Last30Days/{slug}-raw.md
+└─ 📎 Raw results saved to ~/Documents/Last30Days-Crypto/{slug}-raw.md
 ---
 ```
 
@@ -1238,7 +1238,7 @@ I have all the links to the {N} {source list} I pulled from. Just ask.
 
 ## WAIT FOR USER'S RESPONSE
 
-**STOP and wait** for the user to respond. Do NOT call any tools after displaying the invitation. The research script already saved raw data to `~/Documents/Last30Days/` via `--save-dir`.
+**STOP and wait** for the user to respond. Do NOT call any tools after displaying the invitation. The research script already saved raw data to `~/Documents/Last30Days-Crypto/` via `--save-dir`.
 
 ---
 
@@ -1250,10 +1250,10 @@ I have all the links to the {N} {source list} I pulled from. Just ask.
 - If they ask to **GO DEEPER** on a subtopic → Elaborate using your research findings
 - If they describe something they want to **CREATE** → Write ONE perfect prompt (see below)
 - If they ask for a **PROMPT** explicitly → Write ONE perfect prompt (see below)
-- If they say **"more fun"**, **"too serious"**, or similar → Write `FUN_LEVEL=high` to `~/.config/last30days/.env` (append, don't overwrite). Confirm: "Fun level set to high. Next run will surface more witty and viral content."
-- If they say **"less fun"**, **"too many jokes"**, or similar → Write `FUN_LEVEL=low` to `~/.config/last30days/.env`. Confirm: "Fun level set to low. Next run will focus on the news."
-- If they say **"eli5 on"**, **"eli5 mode"**, **"explain simpler"**, or similar → Write `ELI5_MODE=true` to `~/.config/last30days/.env`. Confirm: "ELI5 mode on. All future runs will explain things like you're 5."
-- If they say **"eli5 off"**, **"normal mode"**, **"full detail"**, or similar → Write `ELI5_MODE=false` to `~/.config/last30days/.env`. Confirm: "ELI5 mode off. Back to full detail."
+- If they say **"more fun"**, **"too serious"**, or similar → Write `FUN_LEVEL=high` to `~/.config/last30days-crypto/.env` (append, don't overwrite). Confirm: "Fun level set to high. Next run will surface more witty and viral content."
+- If they say **"less fun"**, **"too many jokes"**, or similar → Write `FUN_LEVEL=low` to `~/.config/last30days-crypto/.env`. Confirm: "Fun level set to low. Next run will focus on the news."
+- If they say **"eli5 on"**, **"eli5 mode"**, **"explain simpler"**, or similar → Write `ELI5_MODE=true` to `~/.config/last30days-crypto/.env`. Confirm: "ELI5 mode on. All future runs will explain things like you're 5."
+- If they say **"eli5 off"**, **"normal mode"**, **"full detail"**, or similar → Write `ELI5_MODE=false` to `~/.config/last30days-crypto/.env`. Confirm: "ELI5 mode off. Back to full detail."
 
 **Only write a prompt when the user wants one.** Don't force a prompt on someone who asked "what could happen next with Iran."
 
@@ -1351,7 +1351,7 @@ Want another prompt? Just tell me what you're creating next.
 - Optionally sends search queries to Brave Search API, Parallel AI API, or OpenRouter API for web search
 - Fetches public Reddit thread data from `reddit.com` for engagement metrics
 - Stores research findings in local SQLite database (watchlist mode only)
-- Saves research briefings as .md files to ~/Documents/Last30Days/
+- Saves research briefings as .md files to ~/Documents/Last30Days-Crypto/
 
 **What this skill does NOT do:**
 - Does not post, like, or modify content on any platform

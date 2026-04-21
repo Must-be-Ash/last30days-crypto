@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SQLite research accumulator for last30days.
+"""SQLite research accumulator for last30days-crypto.
 
 Stores topics, research runs, and findings with:
 - WAL mode for safe concurrent access (cron + user)
@@ -7,7 +7,7 @@ Stores topics, research runs, and findings with:
 - URL-based dedup with engagement metric updates on re-sighting
 - Lightweight schema migrations without external dependencies
 
-Database location: ~/.local/share/last30days/research.db
+Database location: ~/.local/share/last30days-crypto/research.db
 """
 
 import argparse
@@ -23,7 +23,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from lib import schema
 
-DB_DIR = Path.home() / ".local" / "share" / "last30days"
+DB_DIR = Path.home() / ".local" / "share" / "last30days-crypto"
 DB_PATH = DB_DIR / "research.db"
 
 # Allow override for testing
@@ -727,7 +727,7 @@ def _cli_stats(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Query the last30days research database")
+    parser = argparse.ArgumentParser(description="Query the last30days-crypto research database")
     sub = parser.add_subparsers(dest="command")
 
     # query

@@ -35,7 +35,7 @@ ENRICH_LIMITS = {
     "deep": 8,
 }
 
-USER_AGENT = "last30days/3.0 (research tool)"
+USER_AGENT = "last30days-crypto/3.0 (research tool)"
 
 
 def _log(msg: str):

@@ -117,7 +117,7 @@ def test_send_generic_webhook_format(mock_requests):
     
     json_data = call_args[1]["json"]
     assert json_data["message"] == "Test message"
-    assert json_data["source"] == "last30days"
+    assert json_data["source"] == "last30days-crypto"
     assert "timestamp" in json_data
     assert isinstance(json_data["timestamp"], float)
 

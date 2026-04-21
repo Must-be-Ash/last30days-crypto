@@ -1,4 +1,4 @@
-"""Core data model for the v3.0.0 last30days pipeline."""
+"""Core data model for the v3.0.0 last30days-crypto pipeline."""
 
 from __future__ import annotations
 

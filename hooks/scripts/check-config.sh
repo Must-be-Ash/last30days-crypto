@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Check last30days configuration status and show appropriate welcome message.
-# Priority: .claude/last30days.env > ~/.config/last30days/.env > env vars
+# Check last30days-crypto configuration status and show appropriate welcome message.
+# Priority: .claude/last30days-crypto.env > ~/.config/last30days-crypto/.env > env vars
 
-PROJECT_ENV=".claude/last30days.env"
-GLOBAL_ENV="$HOME/.config/last30days/.env"
+PROJECT_ENV=".claude/last30days-crypto.env"
+GLOBAL_ENV="$HOME/.config/last30days-crypto/.env"
 
 # Helper: warn if file permissions are too open
 check_perms() {
@@ -14,7 +14,7 @@ check_perms() {
   local perms
   perms=$(stat -f '%Lp' "$file" 2>/dev/null || stat -c '%a' "$file" 2>/dev/null || echo "")
   if [[ -n "$perms" && "$perms" != "600" && "$perms" != "400" ]]; then
-    echo "/last30days: WARNING — $file has permissions $perms (should be 600)."
+    echo "/last30days-crypto: WARNING — $file has permissions $perms (should be 600)."
     echo "  Fix: chmod 600 $file"
   fi
 }
@@ -55,54 +55,35 @@ fi
 SETUP_COMPLETE="${ENV_SETUP_COMPLETE:-${SETUP_COMPLETE:-}}"
 
 # If setup has never been run, show welcome message for new users
-if [[ -z "$SETUP_COMPLETE" && -z "$CONFIG_FILE" && -z "${OPENAI_API_KEY:-}" && -z "${SCRAPECREATORS_API_KEY:-}" && -z "${AUTH_TOKEN:-}" && -z "${XAI_API_KEY:-}" ]]; then
+if [[ -z "$SETUP_COMPLETE" && -z "$CONFIG_FILE" && -z "${AUTH_TOKEN:-}" && -z "${XAI_API_KEY:-}" ]]; then
   cat <<'EOF'
-/last30days: Ready to use. Run /last30days to get started — setup takes 30 seconds.
+/last30days-crypto: Ready to use. Run /last30days-crypto to get started — add AUTH_TOKEN/CT0 (X cookies) and crypto API keys to ~/.config/last30days-crypto/.env when you're ready.
 
-Reddit, Hacker News, and Polymarket work out of the box.
-The setup wizard can unlock X/Twitter, YouTube, and more.
+Reddit and Hacker News work out of the box. X (AUTH_TOKEN/CT0) is the primary
+qualitative source; CoinGecko, Messari, and LunarCrush keys unlock crypto enrichment.
 EOF
   exit 0
 fi
 
-# Setup done but check for ScrapeCreators
-HAS_SCRAPECREATORS="${ENV_SCRAPECREATORS_API_KEY:-${SCRAPECREATORS_API_KEY:-}}"
 HAS_X="${ENV_AUTH_TOKEN:-${AUTH_TOKEN:-}}"
 HAS_XAI="${ENV_XAI_API_KEY:-${XAI_API_KEY:-}}"
-HAS_YTDLP=""
-if command -v yt-dlp &>/dev/null; then
-  HAS_YTDLP="yes"
-fi
-HAS_BSKY="${ENV_BSKY_HANDLE:-${BSKY_HANDLE:-}}"
 HAS_EXA="${ENV_EXA_API_KEY:-${EXA_API_KEY:-}}"
+HAS_SERPER="${ENV_SERPER_API_KEY:-${SERPER_API_KEY:-}}"
+HAS_CG="${ENV_COINGECKO_API_KEY:-${COINGECKO_API_KEY:-}}"
+HAS_MSR="${ENV_MESSARI_API_KEY:-${MESSARI_API_KEY:-${ENV_MESSARI_SDK_API_KEY:-${MESSARI_SDK_API_KEY:-}}}}"
+HAS_LC="${ENV_LUNARCRUSH_API_KEY:-${LUNARCRUSH_API_KEY:-}}"
 
-# Count active sources
-SOURCE_COUNT=2  # HN + Polymarket are always free
-if [[ -n "$HAS_X" || -n "$HAS_XAI" ]]; then
-  SOURCE_COUNT=$((SOURCE_COUNT + 1))
-fi
-# Reddit public JSON always works
-SOURCE_COUNT=$((SOURCE_COUNT + 1))
-if [[ -n "$HAS_YTDLP" ]]; then
-  SOURCE_COUNT=$((SOURCE_COUNT + 1))
-fi
-if [[ -n "$HAS_EXA" ]]; then
-  SOURCE_COUNT=$((SOURCE_COUNT + 1))
-fi
-if [[ -n "$HAS_BSKY" ]]; then
-  SOURCE_COUNT=$((SOURCE_COUNT + 1))
-fi
-if [[ -n "$HAS_SCRAPECREATORS" ]]; then
-  SOURCE_COUNT=$((SOURCE_COUNT + 3))  # Reddit comments + TikTok + Instagram
-fi
+SOURCE_COUNT=2  # HN + Reddit always free
+[[ -n "$HAS_X" || -n "$HAS_XAI" ]] && SOURCE_COUNT=$((SOURCE_COUNT + 1))
+[[ -n "$HAS_EXA" || -n "$HAS_SERPER" ]] && SOURCE_COUNT=$((SOURCE_COUNT + 1))
+[[ -n "$HAS_CG" ]] && SOURCE_COUNT=$((SOURCE_COUNT + 1))
+[[ -n "$HAS_MSR" ]] && SOURCE_COUNT=$((SOURCE_COUNT + 1))
+[[ -n "$HAS_LC" ]] && SOURCE_COUNT=$((SOURCE_COUNT + 1))
 
-if [[ -n "$HAS_SCRAPECREATORS" ]]; then
-  # Fully configured — compact ready message
-  echo "/last30days: Ready — ${SOURCE_COUNT} sources active."
-else
-  # Setup done but missing ScrapeCreators — recommend it
-  echo "/last30days: Ready — ${SOURCE_COUNT} sources active."
-  echo "  Tip: Add ScrapeCreators for Reddit comments + TikTok + Instagram."
-  echo "  10,000 free API calls, no credit card — scrapecreators.com"
-  echo "  last30days has no affiliation with any API provider."
+echo "/last30days-crypto: Ready — ${SOURCE_COUNT} sources active."
+if [[ -z "$HAS_X" && -z "$HAS_XAI" ]]; then
+  echo "  Tip: add AUTH_TOKEN + CT0 (X cookies) for primary qualitative coverage."
+fi
+if [[ -z "$HAS_CG" || -z "$HAS_MSR" || -z "$HAS_LC" ]]; then
+  echo "  Tip: add COINGECKO_API_KEY, MESSARI_API_KEY, LUNARCRUSH_API_KEY for crypto enrichment."
 fi

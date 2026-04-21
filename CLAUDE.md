@@ -1,6 +1,6 @@
 # last30days-crypto Skill
 
-Claude Code skill (slash command `/last30days-crypto`) for crypto research. X is the primary qualitative source; CoinGecko, Messari, and LunarCrush provide market, on-chain, and social-quant data; web/Reddit/HN/GitHub fill in. Repo: <https://github.com/Must-be-Ash/last30days-crypto>. Sibling vanilla skill `/last30days` (from `mvanhorn/last30days-skill`) can be installed alongside — they share `~/.config/last30days/.env` and `~/Documents/Last30Days/`.
+Claude Code skill (slash command `/last30days-crypto`) for crypto research. X is the primary qualitative source; CoinGecko, Messari, and LunarCrush provide market, on-chain, and social-quant data; web/Reddit/HN/GitHub fill in. Repo: <https://github.com/Must-be-Ash/last30days-crypto>. **Fully separated from the vanilla `/last30days` skill (mvanhorn/last30days-skill)**: this skill reads from `~/.config/last30days-crypto/.env` and writes outputs to `~/Documents/Last30Days-Crypto/` so both can coexist with zero shared state.
 
 ## Structure
 - `scripts/last30days.py` — main research engine
@@ -21,7 +21,7 @@ bash scripts/sync.sh                                                # Deploy to 
 ```
 
 ## Env vars
-Loaded from `~/.config/last30days/.env`. Required: `AUTH_TOKEN` + `CT0` (X cookies). Recommended: `XAI_API_KEY`, `COINGECKO_API_KEY`, `MESSARI_API_KEY` (legacy `MESSARI_SDK_API_KEY` also accepted), `LUNARCRUSH_API_KEY`, `FIRECRAWL_API_KEY`. Optional: `SERPER_API_KEY`/`EXA_API_KEY` (web), `GITHUB_TOKEN`, `PERPLEXITY_API_KEY`.
+Loaded from `~/.config/last30days-crypto/.env`. Required: `AUTH_TOKEN` + `CT0` (X cookies). Recommended: `XAI_API_KEY`, `COINGECKO_API_KEY`, `MESSARI_API_KEY` (legacy `MESSARI_SDK_API_KEY` also accepted), `LUNARCRUSH_API_KEY`, `FIRECRAWL_API_KEY`. Optional: `SERPER_API_KEY`/`EXA_API_KEY` (web), `GITHUB_TOKEN`, `PERPLEXITY_API_KEY`.
 
 ## Rules
 - `lib/__init__.py` must be bare package marker (comment only, NO eager imports)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Morning briefing generator for last30days.
+"""Morning briefing generator for last30days-crypto.
 
 Synthesizes accumulated findings into formatted briefings.
 The Python script collects the data; the agent (via SKILL.md) does the
@@ -22,7 +22,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import store
 
-BRIEFS_DIR = Path.home() / ".local" / "share" / "last30days" / "briefs"
+BRIEFS_DIR = Path.home() / ".local" / "share" / "last30days-crypto" / "briefs"
 
 
 def _parse_sqlite_utc_timestamp(value: str) -> datetime:
@@ -40,7 +40,7 @@ def generate_daily(since: str = None) -> dict:
     if not topics:
         return {
             "status": "no_topics",
-            "message": "No watchlist topics yet. Add one with: last30days watch add \"your topic\"",
+            "message": "No watchlist topics yet. Add one with: last30days-crypto watch add \"your topic\"",
         }
 
     enabled = [t for t in topics if t["enabled"]]
@@ -230,7 +230,7 @@ def _save_briefing(data: dict, suffix: str = ""):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate last30days briefings")
+    parser = argparse.ArgumentParser(description="Generate last30days-crypto briefings")
     sub = parser.add_subparsers(dest="command")
 
     # generate

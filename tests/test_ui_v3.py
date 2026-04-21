@@ -14,7 +14,7 @@ from lib import ui
 class UiV3Tests(unittest.TestCase):
     def test_show_diagnostic_banner_uses_v3_source_model(self):
         diag = {
-            "available_sources": ["grounding", "youtube"],
+            "available_sources": ["grounding"],
             "providers": {"google": True, "openai": False, "xai": False},
             "x_backend": None,
             "bird_installed": True,
@@ -27,10 +27,15 @@ class UiV3Tests(unittest.TestCase):
             with redirect_stderr(stderr):
                 ui.show_diagnostic_banner(diag)
         output = stderr.getvalue()
-        self.assertIn("Reddit", output)
-        self.assertIn("unavailable", output)
-        self.assertIn("Add AUTH_TOKEN/CT0 or XAI_API_KEY", output)
-        self.assertIn("brave API available", output)
+        self.assertIn("/last30days-crypto", output)
+        self.assertIn("X/Twitter", output)
+        self.assertIn("AUTH_TOKEN", output)
+        self.assertIn("XAI_API_KEY", output)
+        self.assertIn("brave API", output)
+        self.assertIn("CoinGecko", output)
+        self.assertIn("Messari", output)
+        self.assertIn("LunarCrush", output)
+        self.assertIn("~/.config/last30days-crypto/.env", output)
 
     def test_build_nux_message_mentions_v3_unlock_paths(self):
         text = ui._build_nux_message(

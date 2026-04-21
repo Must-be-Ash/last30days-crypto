@@ -1,4 +1,4 @@
-"""First-run setup wizard for last30days.
+"""First-run setup wizard for last30days-crypto.
 
 Detects first run, performs auto-setup (cookie extraction + yt-dlp check),
 and writes configuration. The actual wizard UI is SKILL.md-driven (the LLM
@@ -105,7 +105,7 @@ def write_setup_config(env_path: Path, from_browser: str = "auto") -> bool:
     Appends to existing file without overwriting existing keys.
 
     Args:
-        env_path: Path to the .env file (e.g. ~/.config/last30days/.env)
+        env_path: Path to the .env file (e.g. ~/.config/last30days-crypto/.env)
         from_browser: Browser extraction mode to write (default: "auto")
 
     Returns:

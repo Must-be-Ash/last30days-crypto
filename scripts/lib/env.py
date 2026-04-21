@@ -1,4 +1,4 @@
-"""Environment and API key management for last30days skill."""
+"""Environment and API key management for last30days-crypto skill."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ elif _config_override:
     CONFIG_DIR = Path(_config_override)
     CONFIG_FILE = CONFIG_DIR / ".env"
 else:
-    CONFIG_DIR = Path.home() / ".config" / "last30days"
+    CONFIG_DIR = Path.home() / ".config" / "last30days-crypto"
     CONFIG_FILE = CONFIG_DIR / ".env"
 
 CODEX_AUTH_FILE = Path(os.environ.get("CODEX_AUTH_FILE", str(Path.home() / ".codex" / "auth.json")))
@@ -58,12 +58,12 @@ def _check_file_permissions(path: Path) -> None:
         # Check if group or other can read (bits 0o044)
         if mode & 0o044:
             sys.stderr.write(
-                f"[last30days] WARNING: {path} is readable by other users. "
+                f"[last30days-crypto] WARNING: {path} is readable by other users. "
                 f"Run: chmod 600 {path}\n"
             )
             sys.stderr.flush()
     except OSError as exc:
-        sys.stderr.write(f"[last30days] WARNING: could not stat {path}: {exc}\n")
+        sys.stderr.write(f"[last30days-crypto] WARNING: could not stat {path}: {exc}\n")
         sys.stderr.flush()
 
 
@@ -102,7 +102,7 @@ def _decode_jwt_payload(token: str) -> dict[str, Any] | None:
         decoded = base64.urlsafe_b64decode(payload_b64 + pad)
         return json.loads(decoded.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError, binascii.Error, IndexError) as exc:
-        sys.stderr.write(f"[last30days] WARNING: malformed JWT token: {exc}\n")
+        sys.stderr.write(f"[last30days-crypto] WARNING: malformed JWT token: {exc}\n")
         sys.stderr.flush()
         return None
 
@@ -138,7 +138,7 @@ def load_codex_auth(path: Path = CODEX_AUTH_FILE) -> dict[str, Any]:
             return json.load(f)
     except json.JSONDecodeError:
         sys.stderr.write(
-            f"[last30days] WARNING: {path} exists but contains invalid JSON -- ignoring\n"
+            f"[last30days-crypto] WARNING: {path} exists but contains invalid JSON -- ignoring\n"
         )
         sys.stderr.flush()
         return {}
@@ -193,12 +193,12 @@ def get_openai_auth(file_env: dict[str, str]) -> OpenAIAuth:
 def _find_project_env() -> Path | None:
     """Find per-project .env by walking up from cwd.
 
-    Searches for .claude/last30days.env in each parent directory,
+    Searches for .claude/last30days-crypto.env in each parent directory,
     stopping at the user's home directory or filesystem root.
     """
     cwd = Path.cwd()
     for parent in [cwd, *cwd.parents]:
-        candidate = parent / '.claude' / 'last30days.env'
+        candidate = parent / '.claude' / 'last30days-crypto.env'
         if candidate.exists():
             return candidate
         # Stop at filesystem root or home
@@ -212,8 +212,8 @@ def get_config() -> dict[str, Any]:
 
     Priority (highest wins):
       1. Environment variables (os.environ)
-      2. .claude/last30days.env (per-project config)
-      3. ~/.config/last30days/.env (global config)
+      2. .claude/last30days-crypto.env (per-project config)
+      3. ~/.config/last30days-crypto/.env (global config)
     """
     # Load from global config file
     file_env = load_env_file(CONFIG_FILE) if CONFIG_FILE else {}

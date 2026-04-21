@@ -84,7 +84,7 @@ class CliV3Tests(unittest.TestCase):
                 cli.ensure_supported_python((3, 9, 6))
         self.assertEqual(1, exc.exception.code)
         message = stderr.getvalue()
-        self.assertIn("last30days v3 requires Python 3.12+", message)
+        self.assertIn("last30days-crypto v3 requires Python 3.12+", message)
         self.assertIn("Detected Python 3.9.6", message)
         self.assertIn("python3.12", message)
 
@@ -107,13 +107,13 @@ class CliV3Tests(unittest.TestCase):
     def test_slugify_and_emit_output_cover_supported_modes(self):
         report = self.make_report()
         self.assertEqual("openclaw-vs-nanoclaw", cli.slugify(report.topic))
-        self.assertEqual("last30days v3.0.0 CLI.", cli.__doc__)
+        self.assertEqual("last30days-crypto v3.0.0 CLI.", cli.__doc__)
 
         compact = cli.emit_output(report, "compact")
         json_output = cli.emit_output(report, "json")
         context = cli.emit_output(report, "context")
 
-        self.assertIn("# last30days v3.0.0", compact)
+        self.assertIn("# last30days-crypto v3.0.0", compact)
         self.assertIn('"topic": "OpenClaw vs NanoClaw"', json_output)
         self.assertIsInstance(context, str)
 

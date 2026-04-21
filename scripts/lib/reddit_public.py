@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from typing import Any, Dict, List, Optional
 
 
-USER_AGENT = "last30days/3.0 (research tool)"
+USER_AGENT = "last30days-crypto/3.0 (research tool)"
 
 # Depth-aware limits for thread counts
 DEPTH_LIMITS = {

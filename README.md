@@ -4,7 +4,7 @@
 
 A hard fork of [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill) rewired for crypto. Twitter/X is the primary qualitative source, web search is secondary, and three crypto data APIs (CoinGecko, Messari, LunarCrush) attach token-level price/derivatives/sentiment data automatically when the planner detects a `$TICKER` or named project. Firecrawl scrapes whitepapers and governance posts on demand. YouTube, TikTok, Instagram, Polymarket, Bluesky, etc. are removed.
 
-The original `/last30days` skill is unaffected — install both side-by-side from their respective repos.
+The original `/last30days` skill is unaffected — install both side-by-side from their respective repos. They have **fully separate config and output paths**: this skill uses `~/.config/last30days-crypto/.env` and writes to `~/Documents/Last30Days-Crypto/`; the vanilla skill keeps using `~/.config/last30days/.env` and `~/Documents/Last30Days/`.
 
 ## Install
 
@@ -45,7 +45,7 @@ CLI flags:
 
 ## Env vars
 
-Loaded from `~/.config/last30days/.env` (shared with the vanilla `/last30days` skill if both are installed):
+Loaded from `~/.config/last30days-crypto/.env` (separate from the vanilla `/last30days` skill, which uses `~/.config/last30days/.env`):
 
 - **Required for X**: `AUTH_TOKEN` + `CT0` (browser cookies) or `XAI_API_KEY`.
 - **Highly recommended (free tier)**: `COINGECKO_API_KEY`, `MESSARI_API_KEY` (legacy `MESSARI_SDK_API_KEY` also accepted), `LUNARCRUSH_API_KEY`, `FIRECRAWL_API_KEY`.

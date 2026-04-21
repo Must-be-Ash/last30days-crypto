@@ -79,7 +79,7 @@ def _send_generic_webhook(url: str, text: str) -> None:
         url,
         json={
             "message": text,
-            "source": "last30days",
+            "source": "last30days-crypto",
             "timestamp": time.time(),
         },
         headers={"Content-Type": "application/json"},
