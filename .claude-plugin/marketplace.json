@@ -1,23 +1,23 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "last30days-skill",
-  "description": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, HN, Polymarket, GitHub, and 5+ more sources.",
+  "name": "last30days-crypto",
+  "description": "Crypto-focused multi-source research. X-first social search plus CoinGecko, Messari, and LunarCrush for market, on-chain, and social-quant data.",
   "owner": {
-    "name": "Matt Van Horn",
-    "url": "https://github.com/mvanhorn"
+    "name": "Must-be-Ash",
+    "url": "https://github.com/Must-be-Ash"
   },
   "plugins": [
     {
-      "name": "last30days",
-      "description": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, HN, Polymarket, GitHub, and 5+ more sources.",
+      "name": "last30days-crypto",
+      "description": "Crypto-focused multi-source research. X-first social search plus CoinGecko, Messari, and LunarCrush for market, on-chain, and social-quant data.",
       "version": "3.0.0",
       "author": {
-        "name": "Matt Van Horn",
-        "url": "https://github.com/mvanhorn"
+        "name": "Must-be-Ash",
+        "url": "https://github.com/Must-be-Ash"
       },
       "source": "./",
       "category": "productivity",
-      "homepage": "https://github.com/mvanhorn/last30days-skill"
+      "homepage": "https://github.com/Must-be-Ash/last30days-crypto"
     }
   ]
 }

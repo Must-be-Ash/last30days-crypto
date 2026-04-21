@@ -1,7 +1,7 @@
 [project]
-name = "last30days-skill"
+name = "last30days-crypto"
 version = "3.0.0"
-description = "Multi-source last-30-days research skill"
+description = "Crypto-focused multi-source last-30-days research skill"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

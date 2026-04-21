@@ -137,8 +137,8 @@ class TestAutoResolve(unittest.TestCase):
         self.assertEqual(result["subreddits"], ["technology", "gadgets"])
         self.assertEqual(result["x_handle"], "techco")
         self.assertIn("breakthrough", result["context"])
-        self.assertEqual(result["searches_run"], 3)
-        self.assertEqual(mock_search.call_count, 3)
+        self.assertEqual(result["searches_run"], 4)
+        self.assertEqual(mock_search.call_count, 4)
 
     @patch("lib.resolve.grounding.web_search")
     def test_search_failure_graceful(self, mock_search):
@@ -167,8 +167,8 @@ class TestAutoResolve(unittest.TestCase):
         self.assertEqual(result["subreddits"], ["cooking"])
         # News search failed, so context is empty
         self.assertEqual(result["context"], "")
-        # 2 out of 3 succeeded
-        self.assertEqual(result["searches_run"], 2)
+        # 3 out of 4 succeeded (subreddit, x_handle, github passed; news failed)
+        self.assertEqual(result["searches_run"], 3)
 
 
 if __name__ == "__main__":

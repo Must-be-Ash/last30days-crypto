@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sync.sh - Deploy last30days skill to all host locations
+# sync.sh - Deploy last30days-crypto skill to all host locations
 # Usage: bash scripts/sync.sh  (run from repo root)
 set -euo pipefail
 
@@ -9,14 +9,11 @@ echo "Source: $SRC"
 COMMON_TARGETS=(
   # Claude Code plugin cache: marketplace installs overwrite on update,
   # but local development needs the cache kept in sync with the repo.
-  # Do NOT add ~/.claude/skills/last30days - it creates a duplicate
-  # /last30days-3 in the slash command menu alongside the plugin version.
-  "$HOME/.claude/plugins/cache/last30days-skill-private/last30days-3/3.0.0-alpha"
-  "$HOME/.claude/plugins/cache/last30days-skill-private/last30days-3-nogem/3.0.0-nogem"
-  "$HOME/.agents/skills/last30days"
-  "$HOME/.codex/skills/last30days"
+  "$HOME/.claude/plugins/cache/last30days-crypto-private/last30days-crypto/3.0.0-alpha"
+  "$HOME/.agents/skills/last30days-crypto"
+  "$HOME/.codex/skills/last30days-crypto"
 )
-OPENCLAW_TARGET="$HOME/.openclaw/skills/last30days"
+OPENCLAW_TARGET="$HOME/.openclaw/skills/last30days-crypto"
 
 sync_target() {
   local target="$1"
@@ -57,7 +54,7 @@ sync_target() {
 
   if (
     cd "$target/scripts" &&
-    python3 -c "import briefing, store, watchlist; from lib import youtube_yt, bird_x, render, ui; print('  Import check: OK')"
+    python3 -c "import briefing, store, watchlist; from lib import bird_x, render, ui; print('  Import check: OK')"
   ); then
     true
   else
@@ -70,9 +67,7 @@ for t in "${COMMON_TARGETS[@]}"; do
 done
 
 # OpenClaw sync only runs when the private-repo OpenClaw variant is present
-# in the source tree. The public repo does not ship variants/open (the variant
-# is sanitized via strip_for_openclaw.py and published separately from
-# last30days-skill-private).
+# in the source tree. The public repo does not ship variants/open.
 if [ -d "$SRC/variants/open" ]; then
   sync_target "$OPENCLAW_TARGET" "$SRC/variants/open/SKILL.md"
 else

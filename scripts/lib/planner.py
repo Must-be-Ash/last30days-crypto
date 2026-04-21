@@ -16,27 +16,53 @@ ALLOWED_INTENTS = {
     "comparison",
     "breaking_news",
     "prediction",
+    # Crypto-tailored intents — added Phase 4.3.
+    # `crypto_data` = quantitative questions (price, OI, funding, holders,
+    # volume, Galaxy Score). Routes heavily to coingecko/messari/lunarcrush.
+    # `crypto_qual` = narrative/sentiment/launch questions. X-first with
+    # LunarCrush as a heavy supporting source.
+    "crypto_data",
+    "crypto_qual",
 }
 ALLOWED_CLUSTER_MODES = {"none", "story", "workflow", "market", "debate"}
+# Crypto-tailored: X is the spine; web/perplexity is the secondary qualitative
+# layer; HN/GitHub/Reddit are tertiary. coingecko/messari/lunarcrush carry
+# market & social-quant data and are appended only when the planner detects
+# a token mention (Phase 4.3).
+_CRYPTO_DATA_SOURCES = ["coingecko", "messari", "lunarcrush"]
+_BASE_PRIORITY = ["x", "grounding", "perplexity", "hackernews", "reddit", "github"]
+_PREDICTION_PRIORITY = ["x", "grounding"] + _CRYPTO_DATA_SOURCES + ["perplexity", "reddit", "hackernews"]
+# Crypto_data: market/onchain/social-quant questions. Crypto APIs first,
+# then X for chatter context, then web for news/docs.
+_CRYPTO_DATA_PRIORITY = _CRYPTO_DATA_SOURCES + ["x", "grounding", "perplexity", "reddit"]
+# Crypto_qual: narrative/sentiment/launch questions. X-first, LunarCrush
+# heavy for sentiment, then web/perplexity for grounded news, then Messari
+# for project profile, then Reddit.
+_CRYPTO_QUAL_PRIORITY = ["x", "lunarcrush", "grounding", "perplexity", "messari", "reddit"]
+
 QUICK_SOURCE_PRIORITY = {
-    "factual": ["hackernews", "reddit", "x", "youtube"],
-    "product": ["youtube", "reddit", "x", "tiktok"],
-    "concept": ["hackernews", "reddit", "x", "youtube"],
-    "opinion": ["reddit", "x", "youtube", "hackernews"],
-    "how_to": ["youtube", "reddit", "x", "hackernews"],
-    "comparison": ["reddit", "x", "hackernews", "youtube"],
-    "breaking_news": ["x", "reddit", "hackernews", "youtube", "polymarket"],
-    "prediction": ["polymarket", "x", "hackernews", "reddit", "youtube"],
+    "factual": _BASE_PRIORITY,
+    "product": _BASE_PRIORITY,
+    "concept": _BASE_PRIORITY,
+    "opinion": _BASE_PRIORITY,
+    "how_to": _BASE_PRIORITY,
+    "comparison": _BASE_PRIORITY,
+    "breaking_news": _BASE_PRIORITY,
+    "prediction": _PREDICTION_PRIORITY,
+    "crypto_data": _CRYPTO_DATA_PRIORITY,
+    "crypto_qual": _CRYPTO_QUAL_PRIORITY,
 }
 SOURCE_PRIORITY = {
-    "factual": ["hackernews", "reddit", "x", "youtube"],
-    "product": ["youtube", "reddit", "x", "tiktok", "hackernews"],
-    "concept": ["hackernews", "reddit", "x", "youtube"],
-    "opinion": ["reddit", "x", "youtube", "hackernews"],
-    "how_to": ["youtube", "reddit", "x", "hackernews"],
-    "comparison": ["reddit", "x", "hackernews", "youtube"],
-    "breaking_news": ["x", "reddit", "hackernews", "youtube", "polymarket"],
-    "prediction": ["polymarket", "x", "hackernews", "reddit", "youtube"],
+    "factual": _BASE_PRIORITY,
+    "product": _BASE_PRIORITY,
+    "concept": _BASE_PRIORITY,
+    "opinion": _BASE_PRIORITY,
+    "how_to": _BASE_PRIORITY,
+    "comparison": _BASE_PRIORITY,
+    "breaking_news": _BASE_PRIORITY,
+    "prediction": _PREDICTION_PRIORITY,
+    "crypto_data": _CRYPTO_DATA_PRIORITY,
+    "crypto_qual": _CRYPTO_QUAL_PRIORITY,
 }
 SOURCE_LIMITS = {
     "quick": {
@@ -48,33 +74,28 @@ SOURCE_LIMITS = {
         "comparison": 2,
         "breaking_news": 2,
         "prediction": 2,
+        "crypto_data": 3,  # crypto-data quick still hits all three crypto APIs
+        "crypto_qual": 3,  # X + LunarCrush + grounding minimum
     },
     # "default" intentionally absent: all available sources are searched
     # at default depth. Fusion and reranking handle quality. quick mode
     # uses tight budgets above for latency.
 }
-INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {
-    "concept": {"polymarket"},
-    "how_to": {"polymarket"},
-}
+INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {}
 SOURCE_CAPABILITIES = {
     "reddit": {"discussion", "social"},
     "x": {"discussion", "social"},
-    "youtube": {"video", "video_longform", "discussion"},
-    "tiktok": {"video", "video_shortform", "social"},
-    "instagram": {"video", "video_shortform", "social"},
     "hackernews": {"discussion", "link"},
-    "bluesky": {"discussion", "social"},
-    "truthsocial": {"discussion", "social"},
-    "polymarket": {"market"},
-    "xiaohongshu": {"video", "video_shortform", "social"},
     "github": {"discussion", "link"},
     "grounding": {"web", "reference", "link"},
     "perplexity": {"web", "reference", "analysis"},
+    "coingecko": {"crypto_data", "market"},
+    "messari": {"crypto_data", "market", "onchain"},
+    "lunarcrush": {"crypto_data", "social"},
 }
 DEFAULT_INTENT_CAPABILITIES = {
-    "comparison": {"discussion", "video", "web", "reference", "social", "link", "market"},
-    "how_to": {"discussion", "video", "web", "reference", "link"},
+    "comparison": {"discussion", "web", "reference", "social", "link"},
+    "how_to": {"discussion", "web", "reference", "link"},
 }
 
 def plan_query(
@@ -86,17 +107,27 @@ def plan_query(
     provider: providers.ReasoningClient | None,
     model: str | None,
     context: str = "",
+    tokens: list[schema.TokenRef] | None = None,
 ) -> schema.QueryPlan:
     """Create a query plan. Comparison queries with extractable entities use a
-    deterministic plan; other intents prefer the configured reasoning provider."""
+    deterministic plan; other intents prefer the configured reasoning provider.
+
+    If ``tokens`` is non-empty, the crypto-data sources (``coingecko``,
+    ``messari``, ``lunarcrush``) are appended to ``available_sources`` so the
+    planner can route them into subqueries. The tokens themselves are
+    attached to the returned ``QueryPlan`` for downstream enrichment.
+    """
+    available_sources = _expand_for_crypto_tokens(available_sources, tokens)
     if _should_force_deterministic_plan(topic):
-        return _fallback_plan(
+        plan = _fallback_plan(
             topic,
             available_sources,
             requested_sources,
             depth,
             note="deterministic-comparison-plan",
         )
+        plan.tokens = list(tokens or [])
+        return plan
     prompt = _build_prompt(topic, available_sources, requested_sources, depth)
     if context:
         prompt += f"\n\nCurrent context (from web search): {context}"
@@ -105,15 +136,34 @@ def plan_query(
             raw = provider.generate_json(model, prompt)
             plan = _sanitize_plan(raw, topic, available_sources, requested_sources, depth)
             if plan.subqueries:
+                plan.tokens = list(tokens or [])
                 return plan
         except (ValueError, KeyError, json.JSONDecodeError, OSError, http.HTTPError) as exc:
             import sys
             print(f"[Planner] LLM planning failed, using deterministic fallback: {type(exc).__name__}: {exc}", file=sys.stderr)
-            return _fallback_plan(
+            plan = _fallback_plan(
                 topic, available_sources, requested_sources, depth,
                 note=f"fallback-plan (LLM error: {type(exc).__name__})",
             )
-    return _fallback_plan(topic, available_sources, requested_sources, depth)
+            plan.tokens = list(tokens or [])
+            return plan
+    plan = _fallback_plan(topic, available_sources, requested_sources, depth)
+    plan.tokens = list(tokens or [])
+    return plan
+
+
+def _expand_for_crypto_tokens(
+    available_sources: list[str],
+    tokens: list[schema.TokenRef] | None,
+) -> list[str]:
+    """When tokens are present, surface the crypto-data sources so the
+    planner picks them. We only append sources that the caller listed as
+    available — pipeline.available_sources(config) gates on the actual key
+    presence."""
+    if not tokens:
+        return available_sources
+    return list(available_sources)  # Already includes crypto sources iff keys
+                                     # were configured (gated upstream).
 
 
 def _build_prompt(
@@ -125,7 +175,7 @@ def _build_prompt(
     requested = ", ".join(requested_sources or ["auto"])
     available = ", ".join(available_sources)
     return f"""
-You are the query planner for a live last-30-days research pipeline.
+You are the query planner for a live last-30-days CRYPTO research pipeline.
 
 Topic: {topic}
 Depth: {depth}
@@ -134,7 +184,7 @@ Requested sources: {requested}
 
 Return JSON only with this shape:
 {{
-  "intent": "factual|product|concept|opinion|how_to|comparison|breaking_news|prediction",
+  "intent": "factual|product|concept|opinion|how_to|comparison|breaking_news|prediction|crypto_data|crypto_qual",
   "freshness_mode": "strict_recent|balanced_recent|evergreen_ok",
   "cluster_mode": "none|story|workflow|market|debate",
   "source_weights": {{"source_name": 0.0}},
@@ -143,27 +193,38 @@ Return JSON only with this shape:
       "label": "short label",
       "search_query": "keyword style query for search APIs",
       "ranking_query": "natural language rewrite for reranking",
-      "sources": ["reddit", "x", "grounding"],
+      "sources": ["x", "grounding", "lunarcrush"],
       "weight": 1.0
     }}
   ],
   "notes": ["optional short notes"]
 }}
 
-Rules:
+Crypto-specific source vocabulary:
+- ``coingecko``: market data — price, market cap, volume, ATH, exchange listings, community size.
+- ``messari``: on-chain & derivatives — open interest, funding rate, futures volume, volatility, project profile.
+- ``lunarcrush``: social-quant — Galaxy Score, AltRank, sentiment %, top influencers, AI bull/bear themes.
+- ``x``: primary qualitative source — what crypto Twitter is actually saying right now.
+- ``grounding`` / ``perplexity``: web search for news, blog posts, governance docs, whitepapers.
+- ``reddit``, ``hackernews``, ``github``: tertiary qualitative + dev-activity context.
+
+Intent rules:
+- ``crypto_data`` for quantitative questions (price, holders, OI, funding, TVL, volume, on-chain metrics, Galaxy Score). Route heavily to coingecko/messari/lunarcrush.
+- ``crypto_qual`` for narrative/sentiment/launch/influencer questions (memecoin narratives, sentiment shifts, top accounts, airdrop hype, ecosystem launches). X-first, LunarCrush heavy.
+- Other intents (factual/comparison/breaking_news/etc.) when the topic is generic crypto research without a clear quant or narrative focus.
+
+General rules:
 - emit 1 to 4 subqueries
 - every subquery must include both search_query and ranking_query
 - sources must be drawn from Available sources only
-- use cluster_mode=none for factual or many how-to queries
-- use strict_recent for breaking news and most predictions
-- use debate for comparison/opinion, market for prediction, workflow for how_to, story for breaking_news
+- use cluster_mode=market for crypto_data and prediction; story for crypto_qual and breaking_news; debate for comparison/opinion; workflow for how_to
+- use strict_recent for breaking news, predictions, and BOTH crypto intents
 - search_query should be concise and keyword-heavy
 - ranking_query should read like a natural-language question
-- preserve exact proper nouns and entity strings from the topic
+- preserve exact proper nouns, ticker symbols, and entity strings from the topic
 - NEVER include temporal phrases in search_query: no 'last 30 days', 'recent', month names, year numbers
 - NEVER include meta-research phrases: no 'news', 'updates', 'public appearances', 'latest developments'
 - search_query should match how content is TITLED on platforms
-- GitHub (Issues/PRs) is best for engineering, developer tools, and open source topics: 'kanye west bully' not 'kanye west album news March 2026'
 """.strip()
 
 
@@ -367,7 +428,7 @@ def _fallback_plan(
                 label="odds",
                 search_query=f"{base_search} odds forecast",
                 ranking_query=f"What are the current odds, forecasts, or market signals about {topic}?",
-                sources=[source for source in source_weights if source in {"polymarket", "grounding", "x", "reddit"}] or list(source_weights),
+                sources=[source for source in source_weights if source in {"messari", "lunarcrush", "coingecko", "grounding", "x", "reddit"}] or list(source_weights),
                 weight=0.7,
             )
         )
@@ -397,6 +458,13 @@ def _fallback_plan(
 
 def _infer_intent(topic: str) -> str:
     text = topic.lower().strip()
+    # Crypto-data signals — quantitative crypto questions go straight to
+    # the data APIs.
+    if re.search(r"\b(price|market cap|marketcap|fdv|volume|holders?|whales?|funding rate|open interest|tvl|liquidity|on[- ]?chain|galaxy score|altrank|market share|order book|spread)\b", text):
+        return "crypto_data"
+    # Crypto-qual signals — narrative/sentiment/launch questions.
+    if re.search(r"\b(memecoin|narrative|sentiment|sentiment|airdrop|launch|listing|hype|community|influencers?|twitter sentiment|sector|thesis|alpha|narratives?)\b", text):
+        return "crypto_qual"
     if re.search(r"\b(vs|versus|compare|compared to|difference between)\b", text):
         return "comparison"
     # Slash-separated proper nouns: "React/Vue/Svelte" (not URLs, not acronyms like CI/CD or I/O)
@@ -422,7 +490,7 @@ def _infer_intent(topic: str) -> str:
 
 
 def _default_freshness(intent: str) -> str:
-    if intent in {"breaking_news", "prediction"}:
+    if intent in {"breaking_news", "prediction", "crypto_data", "crypto_qual"}:
         return "strict_recent"
     if intent in {"concept", "how_to"}:
         return "evergreen_ok"
@@ -439,25 +507,43 @@ def _default_cluster_mode(intent: str) -> str:
         "factual": "none",
         "product": "none",
         "concept": "none",
+        "crypto_data": "market",
+        "crypto_qual": "story",
     }.get(intent, "none")
 
 
 def _default_source_weights(intent: str, sources: list[str]) -> dict[str, float]:
+    # Crypto-tailored: X is the spine across most intents. Crypto-data /
+    # crypto-qual intents tilt heavily toward the data APIs.
     base = {source: 1.0 for source in sources}
+    for source, bonus in {"x": 1.5, "grounding": 0.6}.items():
+        if source in base:
+            base[source] += bonus
     if intent == "prediction":
-        for source, bonus in {"polymarket": 2.5, "x": 1.3}.items():
+        for source, bonus in {"x": 0.8, "messari": 1.5, "lunarcrush": 1.5, "coingecko": 1.0}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "breaking_news":
-        for source, bonus in {"x": 1.5, "reddit": 1.3, "hackernews": 0.8}.items():
+        for source, bonus in {"x": 1.0, "reddit": 0.6, "hackernews": 0.4}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "how_to":
-        for source, bonus in {"youtube": 2.0, "hackernews": 0.8}.items():
+        for source, bonus in {"hackernews": 0.8, "github": 0.5}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "factual":
-        for source, bonus in {"reddit": 0.8, "x": 0.5}.items():
+        for source, bonus in {"reddit": 0.4, "grounding": 0.4}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "crypto_data":
+        # Quantitative crypto: data APIs lead, X provides chatter context.
+        for source, bonus in {"coingecko": 2.0, "messari": 2.0, "lunarcrush": 1.5, "grounding": 0.4}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "crypto_qual":
+        # Narrative/sentiment: X-first, LunarCrush heavy for sentiment data,
+        # web second for grounded news, Messari lightly for project profile.
+        for source, bonus in {"x": 1.0, "lunarcrush": 1.8, "messari": 0.8, "grounding": 0.4}.items():
             if source in base:
                 base[source] += bonus
     return base

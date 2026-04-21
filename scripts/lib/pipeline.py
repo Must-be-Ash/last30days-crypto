@@ -12,13 +12,17 @@ from typing import Any
 
 from . import (
     bird_x,
+    coingecko,
     dates,
     dedupe,
     entity_extract,
     env,
+    firecrawl,
     github,
     grounding,
     hackernews,
+    lunarcrush,
+    messari,
     normalize,
     perplexity,
     planner,
@@ -48,6 +52,12 @@ SEARCH_ALIAS = {
 
 MAX_SOURCE_FETCHES: dict[str, int] = {"x": 2}
 
+# Crypto data APIs are not retrieved via the qualitative dispatch loop —
+# they're enriched out-of-band by ``_run_crypto_enrichment`` after the
+# main retrieval pass. Listing them here filters them out of the per-source
+# dispatch so we don't hit "Unsupported source" errors.
+CRYPTO_ENRICHMENT_SOURCES = {"coingecko", "messari", "lunarcrush"}
+
 MOCK_AVAILABLE_SOURCES = [
     "x",
     "grounding",
@@ -55,6 +65,9 @@ MOCK_AVAILABLE_SOURCES = [
     "hackernews",
     "github",
     "reddit",
+    "coingecko",
+    "messari",
+    "lunarcrush",
 ]
 
 
@@ -85,6 +98,15 @@ def available_sources(config: dict[str, Any], requested_sources: list[str] | Non
         available.append("github")
     # Reddit_public needs no API key - tertiary qualitative source.
     available.append("reddit")
+    # Crypto data APIs - additive enrichment sources. Pipeline only invokes
+    # them when the planner detects a token mention (Phase 4); listing them
+    # here just makes them eligible for selection.
+    if env.is_coingecko_available(config):
+        available.append("coingecko")
+    if env.is_messari_available(config):
+        available.append("messari")
+    if env.is_lunarcrush_available(config):
+        available.append("lunarcrush")
     return available
 
 
@@ -134,9 +156,6 @@ def run(
     web_backend: str = "auto",
     external_plan: dict | None = None,
     subreddits: list[str] | None = None,
-    tiktok_hashtags: list[str] | None = None,
-    tiktok_creators: list[str] | None = None,
-    ig_creators: list[str] | None = None,
     lookback_days: int = 30,
     github_user: str | None = None,
     github_repos: list[str] | None = None,
@@ -161,12 +180,53 @@ def run(
     if not available:
         raise RuntimeError("No sources are available for this run.")
 
+    # Crypto token extraction: surfaces tokens for enrichment dispatch in
+    # Phase 5.1 and is attached to the QueryPlan via the planner.
+    extracted_tokens: list[schema.TokenRef] = []
+    if not mock:
+        try:
+            from . import token_extract
+            seen_symbols: set[str] = set()
+            # Honor `--token` CLI flag: prepend force-included symbols so they
+            # always make the cap, then run normal extraction over the topic.
+            forced = (config.get("_force_tokens") or "").strip()
+            if forced:
+                cg_key = env.get_coingecko_key(config)
+                for sym in [s.strip() for s in forced.split(",") if s.strip()]:
+                    resolved = coingecko.resolve_token(sym, api_key=cg_key) if cg_key else None
+                    name = (resolved or {}).get("name") or sym
+                    coin_id = (resolved or {}).get("id")
+                    extracted_tokens.append(schema.TokenRef(
+                        symbol=sym.upper(),
+                        name=name,
+                        coingecko_id=coin_id,
+                        messari_slug=(name or sym).lower().replace(" ", "-"),
+                        lunarcrush_topic=(name or sym).lower(),
+                        market_cap_rank=(resolved or {}).get("market_cap_rank"),
+                    ))
+                    seen_symbols.add(sym.upper())
+            raw_tokens = token_extract.extract_tokens(topic, config)
+            for ref in raw_tokens:
+                if ref.symbol.upper() in seen_symbols:
+                    continue
+                extracted_tokens.append(schema.TokenRef(
+                    symbol=ref.symbol,
+                    name=ref.name,
+                    coingecko_id=ref.coingecko_id,
+                    messari_slug=ref.messari_slug,
+                    lunarcrush_topic=ref.lunarcrush_topic,
+                    market_cap_rank=ref.market_cap_rank,
+                ))
+        except Exception as exc:
+            print(f"[Pipeline] Token extraction failed: {exc}", file=sys.stderr)
+
     if external_plan:
         # External plan provided (e.g., from Claude Code via --plan flag).
         # Parse it through the same sanitizer to validate structure.
         plan = planner._sanitize_plan(
             external_plan, topic, available, requested_sources, depth,
         )
+        plan.tokens = list(extracted_tokens)
         print(f"[Planner] Using external plan ({len(plan.subqueries)} subqueries)", file=sys.stderr)
     else:
         plan = planner.plan_query(
@@ -177,6 +237,7 @@ def run(
             provider=None if mock else reasoning_provider,
             model=None if mock else runtime.planner_model,
             context=config.get("_auto_resolve_context", ""),
+            tokens=extracted_tokens,
         )
 
     # Safety net: ensure grounding appears in all subqueries even if the planner
@@ -252,6 +313,9 @@ def run(
             for source in subquery.sources:
                 if source not in available:
                     continue
+                # Crypto enrichment sources are dispatched separately.
+                if source in CRYPTO_ENRICHMENT_SOURCES:
+                    continue
                 # Skip GitHub keyword search if person-mode already ran
                 if source == "github" and (_github_person_done or _github_custom_done):
                     continue
@@ -278,9 +342,6 @@ def run(
                         web_backend=web_backend,
                         raw_topic=topic,
                         subreddits=subreddits,
-                        tiktok_hashtags=tiktok_hashtags,
-                        tiktok_creators=tiktok_creators,
-                        ig_creators=ig_creators,
                     )
                 ] = (subquery, source)
 
@@ -308,9 +369,6 @@ def run(
                             web_backend=web_backend,
                             raw_topic=topic,
                             subreddits=subreddits,
-                            tiktok_hashtags=tiktok_hashtags,
-                            tiktok_creators=tiktok_creators,
-                            ig_creators=ig_creators,
                         )
                     except Exception as retry_exc:
                         bundle.errors_by_source[source] = f"{exc} (retried once, still failed: {retry_exc})"
@@ -398,6 +456,14 @@ def run(
     clusters = cluster_candidates(ranked_candidates, plan)
     warnings = _warnings(items_by_source, ranked_candidates, bundle.errors_by_source)
 
+    # Crypto enrichment: fetch typed bundles for each detected token from
+    # CoinGecko / Messari / LunarCrush. Runs in parallel; failures degrade
+    # gracefully via per-source error fields on each bundle. Skipped under
+    # mock to keep mock runs hermetic, and skipped when --no-crypto is set.
+    crypto_enrichment: dict[str, list[dict[str, Any]]] = {}
+    if not mock and plan.tokens and not config.get("_no_crypto"):
+        crypto_enrichment = _run_crypto_enrichment(plan.tokens, config, depth)
+
     return schema.Report(
         topic=topic,
         range_from=from_date,
@@ -411,7 +477,76 @@ def run(
         errors_by_source=bundle.errors_by_source,
         warnings=warnings,
         artifacts=bundle.artifacts,
+        crypto_enrichment=crypto_enrichment,
+        tokens=list(plan.tokens),
     )
+
+
+def _run_crypto_enrichment(
+    tokens: list[schema.TokenRef],
+    config: dict[str, Any],
+    depth: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """Fan out enrichment calls across CG/Messari/LunarCrush in parallel.
+
+    Each module's ``enrich(...)`` is called once per token. Tokens are capped
+    at 2 by default (LunarCrush's 10-req/min Discover-tier ceiling becomes a
+    bottleneck above this; users can lift via env var if they upgrade tier).
+    """
+    cg_key = env.get_coingecko_key(config)
+    msr_key = env.get_messari_key(config)
+    lc_key = env.get_lunarcrush_key(config)
+
+    if not (cg_key or msr_key or lc_key):
+        return {}
+
+    max_tokens = int(config.get("LAST30DAYS_CRYPTO_MAX_TOKENS") or 2)
+    capped = tokens[:max_tokens]
+
+    out: dict[str, list[dict[str, Any]]] = {}
+    if cg_key:
+        out["coingecko"] = []
+    if msr_key:
+        out["messari"] = []
+    if lc_key:
+        out["lunarcrush"] = []
+
+    # Reset Firecrawl per-run budget at the start of every pipeline run.
+    if env.is_firecrawl_available(config):
+        firecrawl.reset()
+
+    tasks = []
+    for ref in capped:
+        if cg_key and ref.coingecko_id:
+            tasks.append(("coingecko", ref, lambda r=ref: coingecko.enrich(
+                r.coingecko_id, api_key=cg_key, depth=depth,
+            )))
+        if msr_key and ref.messari_slug:
+            tasks.append(("messari", ref, lambda r=ref: messari.enrich(
+                r.messari_slug, api_key=msr_key, depth=depth,
+            )))
+        if lc_key and ref.lunarcrush_topic:
+            tasks.append(("lunarcrush", ref, lambda r=ref: lunarcrush.enrich(
+                r.lunarcrush_topic, api_key=lc_key, depth=depth,
+            )))
+
+    if not tasks:
+        return out
+
+    max_workers = min(8, len(tasks))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(fn): (source, ref) for source, ref, fn in tasks}
+        for future in as_completed(futures):
+            source, ref = futures[future]
+            try:
+                bundle = future.result()
+            except Exception as exc:  # network/timeout/etc; degrade gracefully
+                bundle = {"error": f"{source}: {type(exc).__name__}: {exc}"}
+            # Stamp ref identity onto the bundle for the renderer.
+            bundle["_ref"] = {"symbol": ref.symbol, "name": ref.name}
+            out.setdefault(source, []).append(bundle)
+
+    return out
 
 
 def _normalize_score_dedupe(
@@ -663,6 +798,7 @@ def _retry_thin_sources(
         if len(bundle.items_by_source.get(source, [])) < 3
         and source not in bundle.errors_by_source
         and source not in _skip
+        and source not in CRYPTO_ENRICHMENT_SOURCES
     ]
 
     if not thin_sources:
@@ -747,9 +883,6 @@ def _retrieve_stream(
     web_backend: str = "auto",
     raw_topic: str = "",
     subreddits: list[str] | None = None,
-    tiktok_hashtags: list[str] | None = None,
-    tiktok_creators: list[str] | None = None,
-    ig_creators: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
     # Early exit if source was rate-limited by a sibling future
     if rate_limited_sources is not None and source in rate_limited_sources:
@@ -815,101 +948,14 @@ def _retrieve_stream(
             )
             return xai_x.parse_x_response(result), {}
         raise RuntimeError("No X backend is available.")
-    if source == "youtube":
-        # Use raw_topic so expand_youtube_queries() generates diverse variants
-        # from the original user topic, not the planner's narrowed search_query.
-        yt_query = raw_topic or subquery.search_query
-        result = None
-        # Try yt-dlp first, fall back to SC YouTube if it fails or isn't installed
-        if which("yt-dlp"):
-            try:
-                result = youtube_yt.search_and_transcribe(yt_query, from_date, to_date, depth=depth)
-            except Exception:
-                result = None
-        if (result is None or not result.get("items")) and env.is_youtube_sc_available(config):
-            sc_token = config.get("SCRAPECREATORS_API_KEY", "")
-            result = youtube_yt.search_youtube_sc(yt_query, from_date, to_date, depth=depth, token=sc_token)
-        if result is None:
-            result = {"items": []}
-        # Enrich top videos with comments when SC key is available
-        items = youtube_yt.parse_youtube_response(result)
-        if items and env.is_youtube_comments_available(config):
-            sc_token = config.get("SCRAPECREATORS_API_KEY", "")
-            youtube_yt.enrich_with_comments(items, token=sc_token)
-        return items, {}
-    if source == "tiktok":
-        # Use raw_topic so expand_tiktok_queries() generates diverse variants
-        # from the original user topic, not the planner's narrowed search_query.
-        tiktok_query = raw_topic or subquery.search_query
-        result = tiktok.search_and_enrich(
-            tiktok_query,
-            from_date,
-            to_date,
-            depth=depth,
-            token=env.get_tiktok_token(config),
-            hashtags=tiktok_hashtags,
-            creators=tiktok_creators,
-        )
-        return tiktok.parse_tiktok_response(result), {}
-    if source == "instagram":
-        # Use raw_topic so expand_instagram_queries() generates diverse variants
-        # from the original user topic, not the planner's narrowed search_query.
-        ig_query = raw_topic or subquery.search_query
-        result = instagram.search_and_enrich(
-            ig_query,
-            from_date,
-            to_date,
-            depth=depth,
-            token=env.get_instagram_token(config),
-            ig_creators=ig_creators,
-        )
-        return instagram.parse_instagram_response(result), {}
     if source == "hackernews":
         result = hackernews.search_hackernews(subquery.search_query, from_date, to_date, depth=depth)
         return hackernews.parse_hackernews_response(result, query=subquery.search_query), {}
-    if source == "bluesky":
-        result = bluesky.search_bluesky(subquery.search_query, from_date, to_date, depth=depth, config=config)
-        return bluesky.parse_bluesky_response(result), {}
-    if source == "threads":
-        result = threads.search_threads(
-            subquery.search_query, from_date, to_date,
-            depth=depth,
-            token=config.get("SCRAPECREATORS_API_KEY"),
-        )
-        return threads.parse_threads_response(result), {}
-    if source == "truthsocial":
-        result = truthsocial.search_truthsocial(subquery.search_query, from_date, to_date, depth=depth, config=config)
-        return truthsocial.parse_truthsocial_response(result), {}
-    if source == "polymarket":
-        result = polymarket.search_polymarket(subquery.search_query, from_date, to_date, depth=depth)
-        return polymarket.parse_polymarket_response(result, topic=subquery.search_query), {}
     if source == "github":
         result = github.search_github(subquery.search_query, from_date, to_date, depth=depth, token=config.get("GITHUB_TOKEN"))
         return result, {}
-    if source == "pinterest":
-        result = pinterest.search_pinterest(
-            subquery.search_query, from_date, to_date,
-            depth=depth,
-            token=env.get_pinterest_token(config),
-        )
-        return pinterest.parse_pinterest_response(result), {}
-    if source == "xiaohongshu":
-        return xiaohongshu_api.search_feeds(
-            subquery.search_query,
-            from_date,
-            to_date,
-            env.get_xiaohongshu_api_base(config),
-            depth=depth,
-        ), {}
     if source == "perplexity":
         return perplexity.search(subquery.search_query, date_range, config, deep=config.get("_deep_research", False))
-    if source == "xquik":
-        result = xquik.search_xquik(
-            subquery.search_query, from_date, to_date,
-            depth=depth,
-            token=env.get_xquik_token(config),
-        )
-        return xquik.parse_xquik_response(result), {}
     raise RuntimeError(f"Unsupported source: {source}")
 
 

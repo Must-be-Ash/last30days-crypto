@@ -1,7 +1,7 @@
 {
-  "name": "last30days-skill",
+  "name": "last30days-crypto",
   "version": "3.0.0",
-  "description": "Research a topic from the last 30 days across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, and the web.",
+  "description": "Crypto research from the last 30 days. X-first social search plus CoinGecko, Messari, and LunarCrush for market, on-chain, and social-quant data.",
   "settings": [
     {
       "name": "Extension Directory",
@@ -10,57 +10,69 @@
       "sensitive": false
     },
     {
-      "name": "ScrapeCreators API Key",
-      "description": "ScrapeCreators API Key for Reddit, TikTok, and Instagram search (required)",
-      "envVar": "SCRAPECREATORS_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "OpenAI API Key",
-      "description": "OpenAI API Key - optional fallback for Reddit discovery",
-      "envVar": "OPENAI_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "xAI API Key",
-      "description": "xAI API Key for X/Twitter search (optional)",
-      "envVar": "XAI_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "OpenRouter API Key",
-      "description": "OpenRouter API Key (optional)",
-      "envVar": "OPENROUTER_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "Parallel AI API Key",
-      "description": "Parallel AI API Key (optional)",
-      "envVar": "PARALLEL_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "Brave Search API Key",
-      "description": "Brave Search API Key (optional)",
-      "envVar": "BRAVE_API_KEY",
-      "sensitive": true
-    },
-    {
-      "name": "Apify API Token",
-      "description": "Apify API Token (optional legacy)",
-      "envVar": "APIFY_API_TOKEN",
-      "sensitive": true
-    },
-    {
       "name": "Twitter AUTH_TOKEN",
-      "description": "Twitter browser AUTH_TOKEN cookie for direct X search (optional)",
+      "description": "Twitter browser AUTH_TOKEN cookie for X search (required)",
       "envVar": "AUTH_TOKEN",
       "sensitive": true
     },
     {
       "name": "Twitter CT0",
-      "description": "Twitter browser CT0 cookie (optional, pair with AUTH_TOKEN)",
+      "description": "Twitter browser CT0 cookie (required, pair with AUTH_TOKEN)",
       "envVar": "CT0",
+      "sensitive": true
+    },
+    {
+      "name": "xAI API Key",
+      "description": "xAI API Key for X/Twitter grounded search (recommended)",
+      "envVar": "XAI_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "CoinGecko API Key",
+      "description": "CoinGecko Pro key for token resolution and price/market data (recommended)",
+      "envVar": "COINGECKO_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "Messari API Key",
+      "description": "Messari API key for asset profiles, derivatives, volatility (recommended)",
+      "envVar": "MESSARI_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "LunarCrush API Key",
+      "description": "LunarCrush API key for social-quant signals, sentiment, top creators (recommended)",
+      "envVar": "LUNARCRUSH_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "Firecrawl API Key",
+      "description": "Firecrawl API key for planner-driven URL scraping fallback (optional)",
+      "envVar": "FIRECRAWL_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "Serper API Key",
+      "description": "Serper.dev key for web grounding (optional)",
+      "envVar": "SERPER_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "Exa API Key",
+      "description": "Exa search key for web grounding (optional)",
+      "envVar": "EXA_API_KEY",
+      "sensitive": true
+    },
+    {
+      "name": "GitHub Token",
+      "description": "GitHub token for repo/issue/PR search (optional)",
+      "envVar": "GITHUB_TOKEN",
+      "sensitive": true
+    },
+    {
+      "name": "Perplexity API Key",
+      "description": "Perplexity API key for additional research grounding (optional)",
+      "envVar": "PERPLEXITY_API_KEY",
       "sensitive": true
     }
   ]

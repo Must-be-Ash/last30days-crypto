@@ -196,7 +196,7 @@ wheels = [
 ]
 
 [[package]]
-name = "last30days-skill"
+name = "last30days-crypto"
 version = "3.0.0"
 source = { virtual = "." }
 dependencies = [

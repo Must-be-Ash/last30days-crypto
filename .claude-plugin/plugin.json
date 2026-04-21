@@ -1,16 +1,15 @@
 {
-  "name": "last30days",
+  "name": "last30days-crypto",
   "version": "3.0.0",
-  "description": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and 5+ more sources. AI agent scores by upvotes, likes, and real money - not editors.",
+  "description": "Crypto-focused multi-source research. Twitter/X-first social search, web grounding, plus CoinGecko, Messari, and LunarCrush for market, on-chain, and social-quant data.",
   "author": {
-    "name": "Matt Van Horn",
-    "email": "mvanhorn@gmail.com",
-    "url": "https://github.com/mvanhorn"
+    "name": "Must-be-Ash",
+    "url": "https://github.com/Must-be-Ash"
   },
-  "homepage": "https://github.com/mvanhorn/last30days-skill",
-  "repository": "https://github.com/mvanhorn/last30days-skill",
+  "homepage": "https://github.com/Must-be-Ash/last30days-crypto",
+  "repository": "https://github.com/Must-be-Ash/last30days-crypto",
   "license": "MIT",
-  "keywords": ["research", "reddit", "twitter", "youtube", "tiktok", "instagram", "trends", "prompts", "polymarket", "github", "perplexity", "threads", "pinterest", "eli5", "hacker-news"],
+  "keywords": ["crypto", "defi", "tokens", "research", "twitter", "x", "coingecko", "messari", "lunarcrush", "firecrawl", "web-search", "multi-source", "news", "citations"],
   "skills": ["./"],
   "hooks": {}
 }

@@ -43,14 +43,14 @@ class RegressionTests(unittest.TestCase):
         for subquery in plan["subqueries"]:
             self.assertGreaterEqual(len(subquery["sources"]), 4)
 
-    def test_how_to_keeps_web_video_and_discussion_sources(self):
+    def test_how_to_keeps_discussion_and_web_sources(self):
         payload = run_mock_json("how to deploy on Fly.io")
         self.assert_common_shape(payload)
         plan = payload["query_plan"]
         self.assertEqual("how_to", plan["intent"])
         sources = set(plan["subqueries"][0]["sources"])
-        self.assertIn("youtube", sources)
         self.assertIn("reddit", sources)
+        self.assertIn("hackernews", sources)
         self.assertGreaterEqual(len(sources), 2)
 
     def test_breaking_news_query_keeps_expected_shape(self):

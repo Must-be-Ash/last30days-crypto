@@ -237,11 +237,12 @@ def get_config() -> dict[str, Any]:
     }
 
     keys = [
+        # Reasoning / planner / rerank providers
         ('XAI_API_KEY', None),
         ('GOOGLE_API_KEY', None),
         ('GEMINI_API_KEY', None),
         ('GOOGLE_GENAI_API_KEY', None),
-        ('XIAOHONGSHU_API_BASE', None),
+        ('OPENROUTER_API_KEY', None),
         ('LAST30DAYS_REASONING_PROVIDER', 'auto'),
         ('LAST30DAYS_PLANNER_MODEL', None),
         ('LAST30DAYS_RERANK_MODEL', None),
@@ -249,22 +250,27 @@ def get_config() -> dict[str, Any]:
         ('LAST30DAYS_X_BACKEND', None),
         ('OPENAI_MODEL_PIN', None),
         ('XAI_MODEL_PIN', None),
-        ('SCRAPECREATORS_API_KEY', None),
-        ('APIFY_API_TOKEN', None),
+        # X / Twitter auth
         ('AUTH_TOKEN', None),
         ('CT0', None),
-        ('BSKY_HANDLE', None),
-        ('BSKY_APP_PASSWORD', None),
-        ('TRUTHSOCIAL_TOKEN', None),
+        # Web search backends
         ('BRAVE_API_KEY', None),
         ('EXA_API_KEY', None),
         ('SERPER_API_KEY', None),
-        ('OPENROUTER_API_KEY', None),
         ('PARALLEL_API_KEY', None),
-        ('XQUIK_API_KEY', None),
+        # Crypto data APIs
+        ('COINGECKO_API_KEY', None),
+        ('MESSARI_API_KEY', None),
+        ('MESSARI_SDK_API_KEY', None),  # legacy alias for MESSARI_API_KEY
+        ('LUNARCRUSH_API_KEY', None),
+        ('FIRECRAWL_API_KEY', None),
+        # GitHub
+        ('GITHUB_TOKEN', None),
+        # Misc
         ('FROM_BROWSER', None),
         ('SETUP_COMPLETE', None),
         ('INCLUDE_SOURCES', None),
+        ('BROWSER_CONSENT', None),
     ]
 
     for key, default in keys:
@@ -297,11 +303,6 @@ COOKIE_DOMAINS: dict[str, dict[str, Any]] = {
         "domain": ".x.com",
         "cookies": ["auth_token", "ct0"],
         "mapping": {"auth_token": "AUTH_TOKEN", "ct0": "CT0"},
-    },
-    "truthsocial": {
-        "domain": ".truthsocial.com",
-        "cookies": ["_session_id"],
-        "mapping": {"_session_id": "TRUTHSOCIAL_TOKEN"},
     },
 }
 
@@ -424,31 +425,6 @@ def get_x_source(config: dict[str, Any]) -> str | None:
     return None
 
 
-def is_ytdlp_available() -> bool:
-    """Check if yt-dlp is installed for YouTube search."""
-    from . import youtube_yt
-    return youtube_yt.is_ytdlp_installed()
-
-
-def is_youtube_comments_available(config: dict[str, Any]) -> bool:
-    """Check if YouTube comment enrichment is available.
-
-    Requires SCRAPECREATORS_API_KEY AND youtube_comments in INCLUDE_SOURCES.
-    """
-    if not config.get('SCRAPECREATORS_API_KEY'):
-        return False
-    include = _parse_include_sources(config)
-    return 'youtube_comments' in include
-
-
-def is_youtube_sc_available(config: dict[str, Any]) -> bool:
-    """Check if ScrapeCreators YouTube search fallback is available.
-
-    Used when yt-dlp is not installed or fails.
-    """
-    return bool(config.get('SCRAPECREATORS_API_KEY'))
-
-
 def is_hackernews_available() -> bool:
     """Check if Hacker News source is available.
 
@@ -457,117 +433,51 @@ def is_hackernews_available() -> bool:
     return True
 
 
-def is_bluesky_available(config: dict[str, Any]) -> bool:
-    """Check if Bluesky source is available.
+# ---------------------------------------------------------------------------
+# Crypto data API accessors
+# ---------------------------------------------------------------------------
 
-    Requires BSKY_HANDLE and BSKY_APP_PASSWORD (app password from bsky.app/settings).
-    """
-    return bool(config.get('BSKY_HANDLE') and config.get('BSKY_APP_PASSWORD'))
-
-
-def is_truthsocial_available(config: dict[str, Any]) -> bool:
-    """Check if Truth Social source is available.
-
-    Requires TRUTHSOCIAL_TOKEN (bearer token from browser dev tools).
-    """
-    return bool(config.get('TRUTHSOCIAL_TOKEN'))
+def get_coingecko_key(config: dict[str, Any]) -> str | None:
+    """Return the CoinGecko Pro API key, if configured."""
+    return config.get('COINGECKO_API_KEY') or None
 
 
-def is_polymarket_available() -> bool:
-    """Check if Polymarket source is available.
-
-    Always returns True - Gamma API is free, no key needed.
-    """
-    return True
+def get_messari_key(config: dict[str, Any]) -> str | None:
+    """Return the Messari API key. Accepts both MESSARI_API_KEY and the
+    legacy MESSARI_SDK_API_KEY name so existing user .env files keep working."""
+    return config.get('MESSARI_API_KEY') or config.get('MESSARI_SDK_API_KEY') or None
 
 
-def is_tiktok_available(config: dict[str, Any]) -> bool:
-    """Check if TikTok source is available (ScrapeCreators or legacy Apify).
-
-    Returns True if SCRAPECREATORS_API_KEY or APIFY_API_TOKEN is set.
-    """
-    return bool(config.get('SCRAPECREATORS_API_KEY') or config.get('APIFY_API_TOKEN'))
+def get_lunarcrush_key(config: dict[str, Any]) -> str | None:
+    """Return the LunarCrush API key, if configured."""
+    return config.get('LUNARCRUSH_API_KEY') or None
 
 
-def get_tiktok_token(config: dict[str, Any]) -> str:
-    """Get TikTok API token, preferring ScrapeCreators over legacy Apify."""
-    return config.get('SCRAPECREATORS_API_KEY') or config.get('APIFY_API_TOKEN') or ''
+def get_firecrawl_key(config: dict[str, Any]) -> str | None:
+    """Return the Firecrawl API key, if configured."""
+    return config.get('FIRECRAWL_API_KEY') or None
+
+
+def is_coingecko_available(config: dict[str, Any]) -> bool:
+    return bool(get_coingecko_key(config))
+
+
+def is_messari_available(config: dict[str, Any]) -> bool:
+    return bool(get_messari_key(config))
+
+
+def is_lunarcrush_available(config: dict[str, Any]) -> bool:
+    return bool(get_lunarcrush_key(config))
+
+
+def is_firecrawl_available(config: dict[str, Any]) -> bool:
+    return bool(get_firecrawl_key(config))
 
 
 def _parse_include_sources(config: dict[str, Any]) -> set[str]:
     """Parse INCLUDE_SOURCES config value into a set of lowercase source names."""
     raw = config.get('INCLUDE_SOURCES') or ''
     return {s.strip().lower() for s in raw.split(',') if s.strip()}
-
-
-def is_threads_available(config: dict[str, Any]) -> bool:
-    """Check if Threads source is available.
-
-    Requires SCRAPECREATORS_API_KEY AND 'threads' in INCLUDE_SOURCES.
-    Threads is an opt-in source - it is not activated by default.
-    """
-    if not config.get('SCRAPECREATORS_API_KEY'):
-        return False
-    return 'threads' in _parse_include_sources(config)
-
-
-def is_instagram_available(config: dict[str, Any]) -> bool:
-    """Check if Instagram source is available (ScrapeCreators).
-
-    Returns True if SCRAPECREATORS_API_KEY is set.
-    Instagram uses the same key as TikTok.
-    """
-    return bool(config.get('SCRAPECREATORS_API_KEY'))
-
-
-def get_instagram_token(config: dict[str, Any]) -> str:
-    """Get Instagram API token (same ScrapeCreators key as TikTok)."""
-    return config.get('SCRAPECREATORS_API_KEY') or ''
-
-
-def get_xiaohongshu_api_base(config: dict[str, Any]) -> str:
-    """Get Xiaohongshu HTTP API base URL.
-
-    Defaults to host.docker.internal so OpenClaw Docker can reach host service.
-    """
-    return (config.get('XIAOHONGSHU_API_BASE') or "http://host.docker.internal:18060").rstrip("/")
-
-
-def is_xiaohongshu_available(config: dict[str, Any]) -> bool:
-    """Check whether Xiaohongshu HTTP API is reachable and logged in."""
-    # Import here to avoid heavy imports at module load.
-    from . import http
-
-    base = get_xiaohongshu_api_base(config)
-    try:
-        # Keep health probe snappy, but allow one retry for transient hiccups.
-        health = http.get(f"{base}/health", timeout=3, retries=2)
-        if not isinstance(health, dict):
-            return False
-        if not health.get("success"):
-            return False
-
-        # Login probe can be slower on some deployments (browser/session checks),
-        # so use a slightly longer timeout to avoid false negatives.
-        login = http.get(f"{base}/api/v1/login/status", timeout=8, retries=2)
-        is_logged_in = (
-            login.get("data", {}).get("is_logged_in")
-            if isinstance(login, dict) else False
-        )
-        return bool(is_logged_in)
-    except (OSError, http.HTTPError):
-        return False
-    except Exception as exc:
-        sys.stderr.write(
-            f"[last30days] WARNING: unexpected error checking Xiaohongshu: "
-            f"{type(exc).__name__}: {exc}\n"
-        )
-        sys.stderr.flush()
-        return False
-
-
-# Backward compat alias
-is_apify_available = is_tiktok_available
 
 
 def get_x_source_status(config: dict[str, Any]) -> dict[str, Any]:
@@ -600,31 +510,3 @@ def get_x_source_status(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Pinterest
-def is_pinterest_available(config: dict[str, Any]) -> bool:
-    """Check if Pinterest source is available.
-
-    Returns True when SCRAPECREATORS_API_KEY is set AND 'pinterest' is in
-    INCLUDE_SOURCES (or requested_sources at the pipeline level).  Pinterest
-    is opt-in because not every topic benefits from visual pin results.
-    """
-    return bool(config.get('SCRAPECREATORS_API_KEY'))
-
-
-def get_pinterest_token(config: dict[str, Any]) -> str:
-    """Get Pinterest API token (same ScrapeCreators key as TikTok/Instagram)."""
-    return config.get('SCRAPECREATORS_API_KEY') or ''
-
-
-# Xquik
-def is_xquik_available(config: dict[str, Any]) -> bool:
-    """Check if Xquik X search source is available.
-
-    Requires XQUIK_API_KEY (API key from xquik.com).
-    """
-    return bool(config.get('XQUIK_API_KEY'))
-
-
-def get_xquik_token(config: dict[str, Any]) -> str:
-    """Get Xquik API key."""
-    return config.get('XQUIK_API_KEY') or ''

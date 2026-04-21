@@ -9,11 +9,12 @@ from . import dates, schema
 SOURCE_LABELS = {
     "grounding": "Web",
     "hackernews": "Hacker News",
-    "truthsocial": "Truth Social",
-    "xiaohongshu": "Xiaohongshu",
     "x": "X",
     "github": "GitHub",
     "perplexity": "Perplexity",
+    "coingecko": "CoinGecko",
+    "messari": "Messari",
+    "lunarcrush": "LunarCrush",
 }
 
 
@@ -78,6 +79,10 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
             lines.extend(_render_candidate(candidate, prefix=f"{rep_index}."))
         lines.append("")
 
+    market_section = _render_market_section(report, full=False)
+    if market_section:
+        lines.extend(market_section)
+
     lines.extend(_render_stats(report))
 
     fun_params = _FUN_LEVELS.get(fun_level, _FUN_LEVELS["medium"])
@@ -134,8 +139,8 @@ def render_full(report: schema.Report) -> str:
     # ALL items by source (flat dump, v2-style)
     lines.append("## All Items by Source")
     lines.append("")
-    source_order = ["reddit", "x", "youtube", "tiktok", "instagram", "threads", "pinterest",
-                    "hackernews", "bluesky", "truthsocial", "polymarket", "grounding", "xiaohongshu", "github", "perplexity"]
+    source_order = ["x", "grounding", "perplexity", "hackernews", "github", "reddit",
+                    "coingecko", "messari", "lunarcrush"]
     for source in source_order:
         items = report.items_by_source.get(source, [])
         if not items:
@@ -177,26 +182,11 @@ def render_full(report: schema.Report) -> str:
                 lines.append(f"  <details><summary>Transcript ({len(transcript.split())} words)</summary>")
                 lines.append(f"  {transcript[:5000]}")
                 lines.append("  </details>")
-            # Polymarket outcome prices and market details
-            outcome_prices = item.metadata.get("outcome_prices") or []
-            if outcome_prices and item.source == "polymarket":
-                question = item.metadata.get("question") or ""
-                if question and question != item.title:
-                    lines.append(f"  Question: {question}")
-                odds_parts = []
-                for name, price in outcome_prices:
-                    if isinstance(price, (int, float)):
-                        pct = f"{price * 100:.0f}%" if price >= 0.1 else f"{price * 100:.1f}%"
-                        odds_parts.append(f"{name}: {pct}")
-                if odds_parts:
-                    lines.append(f"  Odds: {' | '.join(odds_parts)}")
-                remaining = item.metadata.get("outcomes_remaining") or 0
-                if remaining:
-                    lines.append(f"  (+{remaining} more outcomes)")
-                end_date = item.metadata.get("end_date")
-                if end_date:
-                    lines.append(f"  Closes: {end_date}")
             lines.append("")
+
+    market_section = _render_market_section(report, full=True)
+    if market_section:
+        lines.extend(market_section)
 
     lines.extend(_render_stats(report))
     lines.extend(_render_source_coverage(report))
@@ -224,6 +214,10 @@ def render_context(report: schema.Report, cluster_limit: int = 6) -> str:
         f"Intent: {report.query_plan.intent}",
         _AI_SAFETY_NOTE,
     ]
+    # Tight crypto summary first (price + AI bull/bear themes only).
+    market_lines = _render_market_section(report, full=False, context_only=True)
+    if market_lines:
+        lines.extend(market_lines)
     freshness_warning = _assess_data_freshness(report)
     if freshness_warning:
         lines.append(f"Freshness warning: {freshness_warning}")
@@ -299,43 +293,6 @@ def _format_volume_short(volume: float) -> str:
     return ""
 
 
-def _polymarket_top_markets(items: list[schema.SourceItem], limit: int = 3) -> list[str]:
-    """Build short summary strings for the top Polymarket markets by volume.
-
-    Returns list like: ['"BULLY <300k": 96% ($66K)', '"Top Spotify": Kanye 6.5% ($21K)']
-    """
-    # Sort by volume descending
-    sorted_items = sorted(
-        items,
-        key=lambda it: it.engagement.get("volume") or 0,
-        reverse=True,
-    )
-
-    summaries = []
-    for item in sorted_items[:limit]:
-        outcome_prices = item.metadata.get("outcome_prices") or []
-        if not outcome_prices:
-            continue
-
-        # Pick the leading outcome (first one, already sorted by relevance in polymarket.py)
-        lead_name, lead_price = outcome_prices[0]
-        # For binary Yes/No markets, show "Yes: 96%" format
-        # For multi-outcome, show "OutcomeName: X%"
-        if isinstance(lead_price, (int, float)):
-            pct = f"{lead_price * 100:.0f}%" if lead_price >= 0.1 else f"{lead_price * 100:.1f}%"
-        else:
-            continue
-
-        # Short title
-        title = item.metadata.get("question") or item.title
-        if len(title) > 30:
-            title = title[:27] + "..."
-
-        summaries.append(f'"{title}": {lead_name} {pct}')
-
-    return summaries
-
-
 def _render_source_coverage(report: schema.Report) -> list[str]:
     lines = [
         "## Source Coverage",
@@ -376,19 +333,6 @@ def _render_stats(report: schema.Report) -> list[str]:
     if top_voices:
         lines.append(f"- Top voices: {', '.join(top_voices)}")
     for source, items in non_empty_sources.items():
-        if source == "polymarket":
-            # Polymarket gets a richer stats line with top market odds
-            market_summaries = _polymarket_top_markets(items)
-            if market_summaries:
-                label = f"{len(items)} market{'s' if len(items) != 1 else ''}"
-                parts_str = f"{label} | " + " | ".join(market_summaries)
-            else:
-                parts_str = f"{len(items)} market{'s' if len(items) != 1 else ''}"
-                engagement_summary = _aggregate_engagement(source, items)
-                if engagement_summary:
-                    parts_str += f" | {engagement_summary}"
-            lines.append(f"- {_source_label(source)}: {parts_str}")
-            continue
         parts = [f"{len(items)} item{'s' if len(items) != 1 else ''}"]
         engagement_summary = _aggregate_engagement(source, items)
         if engagement_summary:
@@ -435,11 +379,11 @@ def _format_actor(item: schema.SourceItem | None) -> str | None:
         return None
     if item.source == "reddit" and item.container:
         return f"r/{item.container}"
-    if item.source in {"x", "bluesky", "truthsocial"} and item.author:
+    if item.source == "x" and item.author:
         return f"@{item.author.lstrip('@')}"
-    if item.source == "youtube" and item.author:
-        return item.author
-    if item.container and item.container != "Polymarket":
+    if item.source == "lunarcrush" and item.author:
+        return f"@{item.author.lstrip('@')}"
+    if item.container:
         return item.container
     if item.author:
         return item.author
@@ -450,17 +394,10 @@ def _format_actor(item: schema.SourceItem | None) -> str | None:
 ENGAGEMENT_DISPLAY: dict[str, list[tuple[str, str]]] = {
     "reddit":       [("score", "pts"), ("num_comments", "cmt")],
     "x":            [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
-    "youtube":      [("views", "views"), ("likes", "likes"), ("comments", "cmt")],
-    "tiktok":       [("views", "views"), ("likes", "likes"), ("comments", "cmt")],
-    "instagram":    [("views", "views"), ("likes", "likes"), ("comments", "cmt")],
-    "threads":      [("likes", "likes"), ("replies", "re")],
-    "pinterest":    [("saves", "saves"), ("comments", "cmt")],
     "hackernews":   [("points", "pts"), ("comments", "cmt")],
-    "bluesky":      [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
-    "truthsocial":  [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
-    "polymarket":   [],
     "github":       [("reactions", "react"), ("comments", "cmt")],
     "perplexity":   [("citations", "cite")],
+    "lunarcrush":   [("interactions_24h", "ints"), ("creator_followers", "flrs")],
 }
 
 
@@ -524,7 +461,6 @@ def _top_actor_summary(source: str, items: list[schema.SourceItem]) -> str | Non
     label = {
         "reddit": "communities",
         "grounding": "domains",
-        "youtube": "channels",
         "hackernews": "domains",
     }.get(source, "voices")
     return f"{label}: {', '.join(actors)}"
@@ -552,13 +488,13 @@ def _top_voices_overall(items_by_source: dict[str, list[schema.SourceItem]], lim
 def _stats_actor(item: schema.SourceItem) -> str | None:
     if item.source == "reddit" and item.container:
         return f"r/{item.container}"
-    if item.source in {"x", "bluesky", "truthsocial"} and item.author:
+    if item.source == "x" and item.author:
+        return f"@{item.author.lstrip('@')}"
+    if item.source == "lunarcrush" and item.author:
         return f"@{item.author.lstrip('@')}"
     if item.source == "grounding" and item.container:
         return item.container
-    if item.source == "youtube" and item.author:
-        return item.author
-    if item.container and item.container != "Polymarket":
+    if item.container:
         return item.container
     if item.author:
         return item.author
@@ -612,7 +548,7 @@ def _comment_insight(item: schema.SourceItem | None) -> str | None:
 
 
 def _transcript_highlights(item: schema.SourceItem | None) -> list[str]:
-    if not item or item.source != "youtube":
+    if not item:
         return []
     return (item.metadata.get("transcript_highlights") or [])[:5]
 
@@ -640,7 +576,7 @@ def _render_best_takes(candidates, limit=5, threshold=70.0):
                     text = body
         source_label = _source_label(candidate.source)
         author = candidate.source_items[0].author if candidate.source_items else None
-        attribution = f"@{author} on {source_label}" if author and candidate.source in ("x", "tiktok", "instagram", "threads") else f"{source_label}"
+        attribution = f"@{author} on {source_label}" if author and candidate.source in ("x", "lunarcrush") else f"{source_label}"
         if author and candidate.source == "reddit":
             container = candidate.source_items[0].container if candidate.source_items else None
             attribution = f"r/{container} comment" if container else "Reddit"
@@ -655,3 +591,304 @@ def _truncate(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3].rstrip() + "..."
+
+
+# ---------------------------------------------------------------------------
+# Market & On-chain rendering (crypto enrichment)
+# ---------------------------------------------------------------------------
+
+def _render_market_section(
+    report: schema.Report,
+    *,
+    full: bool = False,
+    context_only: bool = False,
+) -> list[str]:
+    """Render the Market & On-chain section grouping enrichment bundles by token.
+
+    - ``full=True``: dump every bundle field verbatim (for ``render_full``).
+    - ``context_only=True``: only price snapshot + bull/bear themes (for ``render_context``).
+    - default: compact per-token sections with curated highlights.
+    """
+    enrich = report.crypto_enrichment or {}
+    if not enrich:
+        return []
+
+    # Group bundles by token symbol so each token's data lives together.
+    grouped: dict[str, dict[str, dict]] = {}
+    for source in ("coingecko", "messari", "lunarcrush"):
+        for bundle in enrich.get(source) or []:
+            ref = bundle.get("_ref") or {}
+            symbol = ref.get("symbol") or bundle.get("symbol") or bundle.get("slug") or "?"
+            grouped.setdefault(symbol, {})[source] = bundle
+
+    if not grouped:
+        return []
+
+    if context_only:
+        lines: list[str] = ["", "Market snapshot:"]
+        for symbol, sources in grouped.items():
+            cg = sources.get("coingecko") or {}
+            lc = sources.get("lunarcrush") or {}
+            name = (sources.get("coingecko") or sources.get("messari") or sources.get("lunarcrush") or {}).get("name") or symbol
+            price = _fmt_money(cg.get("price_usd"))
+            d24 = _fmt_pct(cg.get("pct_change_24h"))
+            d30 = _fmt_pct(cg.get("pct_change_30d"))
+            line = f"- {symbol} ({name}): {price} | 24h {d24} | 30d {d30}"
+            if lc.get("trend"):
+                line += f" | LC trend {lc['trend']}"
+            lines.append(line)
+            for theme in (lc.get("bullish_themes") or [])[:1]:
+                lines.append(f"  Bull: {theme.get('title')} ({theme.get('percent')}%)")
+            for theme in (lc.get("bearish_themes") or [])[:1]:
+                lines.append(f"  Bear: {theme.get('title')} ({theme.get('percent')}%)")
+        return lines
+
+    lines = ["## Market & On-chain", ""]
+    for symbol, sources in grouped.items():
+        cg = sources.get("coingecko") or {}
+        msr = sources.get("messari") or {}
+        lc = sources.get("lunarcrush") or {}
+        name = cg.get("name") or msr.get("name") or symbol
+        rank = cg.get("market_cap_rank")
+        rank_str = f" — rank #{rank}" if rank else ""
+        lines.append(f"### {symbol} — {name}{rank_str}")
+        lines.append("")
+
+        # Price snapshot (CoinGecko)
+        if cg and "error" not in cg:
+            lines.append("**Price snapshot** (CoinGecko)")
+            lines.append(
+                f"- Price: {_fmt_money(cg.get('price_usd'))}  |  "
+                f"MC: {_fmt_money(cg.get('market_cap_usd'))}  |  "
+                f"FDV: {_fmt_money(cg.get('fully_diluted_valuation_usd'))}  |  "
+                f"24h vol: {_fmt_money(cg.get('total_volume_usd'))}"
+            )
+            lines.append(
+                f"- 24h: {_fmt_pct(cg.get('pct_change_24h'))}  |  "
+                f"7d: {_fmt_pct(cg.get('pct_change_7d'))}  |  "
+                f"30d: {_fmt_pct(cg.get('pct_change_30d'))}  |  "
+                f"ATH: {_fmt_money(cg.get('ath_usd'))} ({_fmt_pct(cg.get('ath_change_pct'))})"
+            )
+            community_bits = []
+            if cg.get("twitter_followers"):
+                handle = cg.get("twitter_handle") or ""
+                community_bits.append(f"X: {_fmt_count(cg.get('twitter_followers'))}{f' (@{handle})' if handle else ''}")
+            if cg.get("reddit_subscribers"):
+                community_bits.append(f"Reddit: {_fmt_count(cg.get('reddit_subscribers'))}")
+            if cg.get("telegram_users"):
+                community_bits.append(f"Telegram: {_fmt_count(cg.get('telegram_users'))}")
+            if cg.get("github_stars"):
+                community_bits.append(f"GitHub stars: {_fmt_count(cg.get('github_stars'))}")
+            if cg.get("github_commits_4w"):
+                community_bits.append(f"commits/4w: {cg.get('github_commits_4w')}")
+            if community_bits:
+                lines.append(f"- Community: {' | '.join(community_bits)}")
+            if cg.get("categories"):
+                cats = ", ".join((cg.get("categories") or [])[:5])
+                lines.append(f"- Categories: {cats}")
+            lines.append("")
+
+        # Social signal (LunarCrush)
+        if lc and "error" not in lc:
+            lines.append("**Social signal** (LunarCrush)")
+            social_bits = []
+            if lc.get("topic_rank") is not None:
+                social_bits.append(f"topic rank #{lc.get('topic_rank')}")
+            if lc.get("trend"):
+                social_bits.append(f"trend {lc.get('trend')}")
+            if lc.get("interactions_24h") is not None:
+                social_bits.append(f"24h interactions {_fmt_count(lc.get('interactions_24h'))}")
+            if lc.get("num_contributors") is not None:
+                social_bits.append(f"contributors {_fmt_count(lc.get('num_contributors'))}")
+            if lc.get("galaxy_score_latest") is not None:
+                gpct = _fmt_pct(lc.get("galaxy_score_change_pct"))
+                social_bits.append(f"Galaxy {lc.get('galaxy_score_latest')} ({gpct})")
+            if lc.get("alt_rank_latest") is not None:
+                social_bits.append(f"AltRank {lc.get('alt_rank_latest')}")
+            if lc.get("sentiment_latest") is not None:
+                social_bits.append(f"sentiment {lc.get('sentiment_latest')}%")
+            if lc.get("social_dominance_latest") is not None:
+                social_bits.append(f"social dominance {lc.get('social_dominance_latest')}%")
+            if social_bits:
+                lines.append(f"- {' | '.join(social_bits)}")
+            # Per-platform sentiment & volume
+            t_sent = lc.get("types_sentiment") or {}
+            t_count = lc.get("types_count") or {}
+            if t_sent or t_count:
+                breakdown = []
+                for platform in ("tweet", "reddit-post", "youtube-video", "tiktok-video", "news"):
+                    posts = t_count.get(platform)
+                    sent = t_sent.get(platform)
+                    if posts or sent:
+                        breakdown.append(f"{platform}: {posts or 0} posts / sent {sent if sent is not None else '–'}")
+                if breakdown:
+                    lines.append(f"- By platform: {' | '.join(breakdown)}")
+            # AI bull/bear themes
+            bullish = lc.get("bullish_themes") or []
+            bearish = lc.get("bearish_themes") or []
+            if bullish or bearish:
+                lines.append("")
+                lines.append("**AI bull/bear themes** (LunarCrush)")
+                for theme in bullish[:2]:
+                    pct = theme.get("percent")
+                    title = theme.get("title") or "(untitled)"
+                    desc = (theme.get("description") or "").strip()
+                    lines.append(f"- Bull: **{title}** ({pct}%) — {_truncate(desc, 200)}")
+                for theme in bearish[:2]:
+                    pct = theme.get("percent")
+                    title = theme.get("title") or "(untitled)"
+                    desc = (theme.get("description") or "").strip()
+                    lines.append(f"- Bear: **{title}** ({pct}%) — {_truncate(desc, 200)}")
+            elif lc.get("ai_summary"):
+                lines.append(f"- Summary: {_truncate(lc.get('ai_summary'), 280)}")
+            # Top creators
+            creators = lc.get("top_creators") or []
+            if creators:
+                lines.append("")
+                lines.append("**Top influencers** (LunarCrush, top 5 by 24h interactions)")
+                for c in creators[:5]:
+                    handle = c.get("handle")
+                    if not handle:
+                        continue
+                    display = c.get("display_name") or handle
+                    flrs = _fmt_count(c.get("followers"))
+                    inter = _fmt_count(c.get("interactions_24h"))
+                    rank = c.get("rank")
+                    lines.append(
+                        f"- [@{handle.lstrip('@')}](https://x.com/{handle.lstrip('@')}) "
+                        f"({display}) — {flrs} followers, {inter} 24h interactions"
+                        + (f", rank #{rank}" if rank else "")
+                    )
+            lines.append("")
+
+        # Derivatives & volatility (Messari)
+        if msr and "error" not in msr:
+            deriv_bits = []
+            if msr.get("oi_latest_usd") is not None:
+                deriv_bits.append(f"OI {_fmt_money(msr.get('oi_latest_usd'))}")
+            if msr.get("oi_pct_change_7d") is not None:
+                deriv_bits.append(f"OI 7d {_fmt_pct(msr.get('oi_pct_change_7d'))}")
+            if msr.get("funding_rate_latest") is not None:
+                deriv_bits.append(f"funding latest {_fmt_pct(msr.get('funding_rate_latest') * 100)}")
+            if msr.get("funding_rate_avg_7d") is not None:
+                deriv_bits.append(f"funding 7d-avg {_fmt_pct(msr.get('funding_rate_avg_7d') * 100)}")
+            if msr.get("futures_volume_latest_usd") is not None:
+                deriv_bits.append(f"futures vol {_fmt_money(msr.get('futures_volume_latest_usd'))}")
+            if msr.get("futures_volume_buy_pct_7d") is not None:
+                deriv_bits.append(f"buy share 7d {msr.get('futures_volume_buy_pct_7d'):.1f}%")
+            if deriv_bits:
+                lines.append("**Derivatives** (Messari)")
+                lines.append(f"- {' | '.join(deriv_bits)}")
+                lines.append("")
+            vol_bits = []
+            if msr.get("volatility_30d") is not None:
+                vol_bits.append(f"30d {msr.get('volatility_30d')}")
+            if msr.get("volatility_90d") is not None:
+                vol_bits.append(f"90d {msr.get('volatility_90d')}")
+            if msr.get("volatility_1y") is not None:
+                vol_bits.append(f"1y {msr.get('volatility_1y')}")
+            if vol_bits:
+                lines.append("**Volatility** (Messari)")
+                lines.append(f"- {' | '.join(vol_bits)}")
+                lines.append("")
+            if msr.get("sector"):
+                sect = msr.get("sector")
+                sub = msr.get("sub_sector")
+                lines.append(f"- Sector: {_join_or_str(sect)}{(' / ' + _join_or_str(sub)) if sub else ''}")
+            if msr.get("tags"):
+                lines.append(f"- Tags: {', '.join(msr.get('tags') or [])}")
+            if msr.get("network_slugs"):
+                lines.append(f"- Networks: {', '.join(msr.get('network_slugs') or [])}")
+            if msr.get("description") and full:
+                lines.append(f"- About: {_truncate(msr.get('description'), 480)}")
+            lines.append("")
+
+        # Top exchanges (CoinGecko tickers)
+        if cg.get("top_exchanges"):
+            lines.append("**Where it trades** (CoinGecko, top 5 by volume)")
+            for tk in (cg.get("top_exchanges") or [])[:5]:
+                exchange = tk.get("exchange") or "?"
+                pair = tk.get("pair") or ""
+                vol = _fmt_money(tk.get("volume_usd"))
+                trust = tk.get("trust_score")
+                trust_str = f", trust={trust}" if trust else ""
+                lines.append(f"- {exchange} — {pair} — {vol}{trust_str}")
+            lines.append("")
+
+        # Per-source error notices (degraded gracefully)
+        for source, key in [("CoinGecko", "coingecko"), ("Messari", "messari"), ("LunarCrush", "lunarcrush")]:
+            bundle = sources.get(key) or {}
+            errs = [v for k, v in bundle.items() if k.endswith("_error") or k == "error"]
+            if errs:
+                lines.append(f"- _{source} note:_ " + " | ".join(str(e)[:200] for e in errs))
+        lines.append("")
+
+        if full:
+            # Dump remaining unrendered fields verbatim for debugging.
+            lines.append("<details><summary>Raw bundles</summary>")
+            lines.append("")
+            for source_name, bundle in sources.items():
+                lines.append(f"#### {source_name}")
+                for k, v in sorted(bundle.items()):
+                    if k.startswith("_"):
+                        continue
+                    if isinstance(v, (list, dict)):
+                        lines.append(f"- {k}: {str(v)[:600]}")
+                    else:
+                        lines.append(f"- {k}: {v}")
+                lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
+    return lines
+
+
+def _fmt_money(value: Any) -> str:
+    if value in (None, "", 0):
+        return "–"
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return "–"
+    if abs(n) >= 1_000_000_000:
+        return f"${n / 1_000_000_000:.2f}B"
+    if abs(n) >= 1_000_000:
+        return f"${n / 1_000_000:.2f}M"
+    if abs(n) >= 1_000:
+        return f"${n / 1_000:.1f}K"
+    if abs(n) >= 1:
+        return f"${n:.2f}"
+    return f"${n:.4f}"
+
+
+def _fmt_pct(value: Any) -> str:
+    if value is None:
+        return "–"
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return "–"
+    sign = "+" if n > 0 else ""
+    return f"{sign}{n:.2f}%"
+
+
+def _fmt_count(value: Any) -> str:
+    if value in (None, "", 0):
+        return "–"
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(n) >= 1_000_000_000:
+        return f"{n / 1_000_000_000:.2f}B"
+    if abs(n) >= 1_000_000:
+        return f"{n / 1_000_000:.2f}M"
+    if abs(n) >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return str(int(n)) if n.is_integer() else f"{n:.1f}"
+
+
+def _join_or_str(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    return str(value or "")

@@ -56,6 +56,23 @@ class SubQuery:
 
 
 @dataclass
+class TokenRef:
+    """Cross-API reference to a single crypto asset.
+
+    Mirrors ``token_extract.TokenRef`` but is stored on the ``QueryPlan`` so
+    downstream stages (enrichment, rendering, JSON emit) can read it without
+    importing the extractor.
+    """
+
+    symbol: str
+    name: str
+    coingecko_id: str | None = None
+    messari_slug: str | None = None
+    lunarcrush_topic: str | None = None
+    market_cap_rank: int | None = None
+
+
+@dataclass
 class QueryPlan:
     """Planner output."""
 
@@ -66,6 +83,7 @@ class QueryPlan:
     subqueries: list[SubQuery]
     source_weights: dict[str, float]
     notes: list[str] = field(default_factory=list)
+    tokens: list[TokenRef] = field(default_factory=list)
 
 
 @dataclass
@@ -155,6 +173,12 @@ class Report:
     errors_by_source: dict[str, str]
     warnings: list[str] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
+    # Crypto enrichment is out-of-band — not fused with qualitative ranking.
+    # Keyed by source name (``coingecko`` / ``messari`` / ``lunarcrush``);
+    # each value is the per-token bundle list returned by that module's
+    # ``enrich(...)``.
+    crypto_enrichment: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    tokens: list[TokenRef] = field(default_factory=list)
 
 
 @dataclass
@@ -205,6 +229,18 @@ def query_plan_from_dict(payload: dict[str, Any]) -> QueryPlan:
         subqueries=[subquery_from_dict(item) for item in payload.get("subqueries") or []],
         source_weights=dict(payload.get("source_weights") or {}),
         notes=list(payload.get("notes") or []),
+        tokens=[token_ref_from_dict(item) for item in payload.get("tokens") or []],
+    )
+
+
+def token_ref_from_dict(payload: dict[str, Any]) -> TokenRef:
+    return TokenRef(
+        symbol=payload.get("symbol") or "",
+        name=payload.get("name") or "",
+        coingecko_id=payload.get("coingecko_id"),
+        messari_slug=payload.get("messari_slug"),
+        lunarcrush_topic=payload.get("lunarcrush_topic"),
+        market_cap_rank=payload.get("market_cap_rank"),
     )
 
 

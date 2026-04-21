@@ -147,6 +147,21 @@ def get(url: str, headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[st
     return request("GET", url, headers=headers, **kwargs)
 
 
+def get_with_params(
+    url: str,
+    params: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """GET helper that appends a urlencoded query string. Skips None values."""
+    if params:
+        clean = {k: v for k, v in params.items() if v is not None}
+        if clean:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{urlencode(clean)}"
+    return request("GET", url, headers=headers, **kwargs)
+
+
 def post(url: str, json_data: Dict[str, Any], headers: Optional[Dict[str, str]] = None, **kwargs) -> Dict[str, Any]:
     """Make a POST request with JSON body."""
     return request("POST", url, headers=headers, json_data=json_data, **kwargs)

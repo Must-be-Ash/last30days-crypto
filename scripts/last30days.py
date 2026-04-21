@@ -65,13 +65,20 @@ def _cleanup_children() -> None:
 atexit.register(_cleanup_children)
 
 
+_SEARCH_ALIAS_EXTRA = {
+    "cg": "coingecko",
+    "msr": "messari",
+    "lc": "lunarcrush",
+}
+
+
 def parse_search_flag(raw: str) -> list[str]:
     sources = []
     for source in raw.split(","):
         source = source.strip().lower()
         if not source:
             continue
-        normalized = pipeline.SEARCH_ALIAS.get(source, source)
+        normalized = pipeline.SEARCH_ALIAS.get(source) or _SEARCH_ALIAS_EXTRA.get(source) or source
         if normalized not in pipeline.MOCK_AVAILABLE_SOURCES:
             raise SystemExit(f"Unknown search source: {source}")
         if normalized not in sources:
@@ -162,9 +169,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plan", help="JSON query plan (skips internal LLM planner). Can be a JSON string or a file path.")
     parser.add_argument("--save-suffix", help="Suffix for saved output filename (e.g., 'gemini' → kanye-west-raw-gemini.md)")
     parser.add_argument("--subreddits", help="Comma-separated subreddit names to search (e.g., SaaS,Entrepreneur)")
-    parser.add_argument("--tiktok-hashtags", help="Comma-separated TikTok hashtags without # (e.g., tella,screenrecording)")
-    parser.add_argument("--tiktok-creators", help="Comma-separated TikTok creator handles (e.g., TellaHQ,taborplace)")
-    parser.add_argument("--ig-creators", help="Comma-separated Instagram creator handles (e.g., tella.tv,laborstories)")
+    parser.add_argument("--token", action="append", default=None,
+                        help="Force-include a token symbol for crypto enrichment (repeatable, e.g. --token HYPE --token SOL).")
+    parser.add_argument("--no-crypto", action="store_true",
+                        help="Skip CoinGecko/Messari/LunarCrush enrichment even when tokens are detected.")
+    parser.add_argument("--scrape", action="append", default=None,
+                        help="Firecrawl-scrape the given URL (repeatable). Counts against the per-run scrape budget.")
     parser.add_argument("--lookback-days", type=int, default=30, help="Number of days to look back for research (default: 30, watchlist uses 90)")
     parser.add_argument("--auto-resolve", action="store_true",
                         help="Use web search to discover subreddits/handles before planning (for platforms without WebSearch)")
@@ -265,9 +275,6 @@ def main() -> int:
     try:
         x_related = [h.strip() for h in args.x_related.split(",") if h.strip()] if args.x_related else None
         subreddits = [s.strip().lstrip("r/") for s in args.subreddits.split(",") if s.strip()] if args.subreddits else None
-        tiktok_hashtags = [h.strip().lstrip("#") for h in args.tiktok_hashtags.split(",") if h.strip()] if args.tiktok_hashtags else None
-        tiktok_creators = [c.strip().lstrip("@") for c in args.tiktok_creators.split(",") if c.strip()] if args.tiktok_creators else None
-        ig_creators = [c.strip().lstrip("@") for c in args.ig_creators.split(",") if c.strip()] if args.ig_creators else None
         # Parse external plan if provided via --plan flag
         external_plan = None
         if args.plan:
@@ -320,6 +327,12 @@ def main() -> int:
             if "perplexity" not in include.lower():
                 config["INCLUDE_SOURCES"] = f"{include},perplexity" if include else "perplexity"
 
+        # Crypto-edition flags consumed by pipeline.run via config dict.
+        if args.no_crypto:
+            config["_no_crypto"] = True
+        if args.token:
+            config["_force_tokens"] = ",".join(t.strip().lstrip("$").upper() for t in args.token if t.strip())
+
         report = pipeline.run(
             topic=topic,
             config=config,
@@ -331,9 +344,6 @@ def main() -> int:
             web_backend=args.web_backend,
             external_plan=external_plan,
             subreddits=subreddits,
-            tiktok_hashtags=tiktok_hashtags,
-            tiktok_creators=tiktok_creators,
-            ig_creators=ig_creators,
             lookback_days=args.lookback_days,
             github_user=github_user,
             github_repos=github_repos,
@@ -342,6 +352,26 @@ def main() -> int:
         progress.end_processing()
         progress.show_error(str(exc))
         raise
+
+    # --scrape: explicit Firecrawl scrapes after the main pipeline returns.
+    # Results land on report.artifacts["firecrawl"] as a list of bundles.
+    if args.scrape:
+        from lib import env as env_mod, firecrawl
+        fc_key = env_mod.get_firecrawl_key(config)
+        if not fc_key:
+            sys.stderr.write("[Firecrawl] --scrape requested but FIRECRAWL_API_KEY is not configured\n")
+        else:
+            scraped = []
+            for url in args.scrape:
+                bundle = firecrawl.scrape(url, api_key=fc_key)
+                bundle["_url"] = url
+                scraped.append(bundle)
+                if "error" in bundle:
+                    sys.stderr.write(f"[Firecrawl] {url}: {bundle['error']}\n")
+                else:
+                    sys.stderr.write(f"[Firecrawl] scraped {url} ({len((bundle.get('data') or {}).get('markdown') or '')} chars markdown)\n")
+            report.artifacts.setdefault("firecrawl", []).extend(scraped)
+
     _show_runtime_ui(report, progress, diag)
     if args.store:
         counts = persist_report(report)

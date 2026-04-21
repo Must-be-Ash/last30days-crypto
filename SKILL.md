@@ -1,12 +1,12 @@
 ---
-name: last30days
+name: last30days-crypto
 version: "3.0.0"
-description: "Multi-query social search with intelligent planning. Agent plans queries when possible, falls back to Gemini/OpenAI when not. Research any topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, and the web."
-argument-hint: 'last30days AI video tools, last30days best noise cancelling headphones'
+description: "Crypto-focused multi-source research. Twitter/X-first social search, web grounding, plus CoinGecko, Messari, and LunarCrush for market, on-chain, and social-quant data."
+argument-hint: 'last30days-crypto $HYPE Hyperliquid Q1, last30days-crypto new memecoin launches on Solana'
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
-homepage: https://github.com/mvanhorn/last30days-skill
-repository: https://github.com/mvanhorn/last30days-skill
-author: mvanhorn
+homepage: https://github.com/Must-be-Ash/last30days-crypto
+repository: https://github.com/Must-be-Ash/last30days-crypto
+author: Must-be-Ash
 license: MIT
 user-invocable: true
 metadata:
@@ -14,56 +14,51 @@ metadata:
     emoji: "📰"
     requires:
       env:
-        - SCRAPECREATORS_API_KEY
+        - AUTH_TOKEN
+        - CT0
       optionalEnv:
-        - OPENAI_API_KEY
         - XAI_API_KEY
+        - OPENAI_API_KEY
         - OPENROUTER_API_KEY
         - PARALLEL_API_KEY
         - BRAVE_API_KEY
-        - APIFY_API_TOKEN
-        - AUTH_TOKEN
-        - CT0
-        - BSKY_HANDLE
-        - BSKY_APP_PASSWORD
-        - TRUTHSOCIAL_TOKEN
+        - EXA_API_KEY
+        - SERPER_API_KEY
+        - COINGECKO_API_KEY
+        - MESSARI_API_KEY
+        - LUNARCRUSH_API_KEY
+        - FIRECRAWL_API_KEY
+        - GITHUB_TOKEN
       bins:
         - node
         - python3
-    primaryEnv: SCRAPECREATORS_API_KEY
+    primaryEnv: AUTH_TOKEN
     files:
       - "scripts/*"
-    homepage: https://github.com/mvanhorn/last30days-skill
+    homepage: https://github.com/Must-be-Ash/last30days-crypto
     tags:
+      - crypto
+      - defi
+      - tokens
       - research
-      - deep-research
-      - reddit
-      - x
       - twitter
-      - youtube
-      - tiktok
-      - instagram
-      - hackernews
-      - polymarket
-      - bluesky
-      - truthsocial
-      - trends
-      - recency
+      - x
+      - coingecko
+      - messari
+      - lunarcrush
+      - firecrawl
+      - web-search
+      - multi-source
       - news
       - citations
-      - multi-source
-      - social-media
-      - analysis
-      - web-search
-      - ai-skill
       - clawhub
 ---
 
-# last30days v2.9.5: Research Any Topic from the Last 30 Days
+# last30days-crypto v3.0.0: Crypto-Focused Research from the Last 30 Days
 
-> **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `~/Documents/Last30Days/`. X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Bluesky search uses optional app password (BSKY_HANDLE/BSKY_APP_PASSWORD env vars - create at bsky.app/settings/app-passwords). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
+> **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `~/Documents/Last30Days/`. X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Crypto data uses optional API keys (COINGECKO_API_KEY, MESSARI_API_KEY, LUNARCRUSH_API_KEY, FIRECRAWL_API_KEY). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
 
-Research ANY topic across Reddit, X, YouTube, and other sources. Surface what people are actually discussing, recommending, betting on, and debating right now.
+Crypto-focused research across Twitter/X (primary), web search, and three crypto data APIs (CoinGecko, Messari, LunarCrush). Surface what crypto Twitter is actually discussing, what the on-chain and derivatives signals say, and what the social-quant indicators (Galaxy Score, AltRank, sentiment) reveal — all in one report.
 
 ## Runtime Preflight
 
@@ -78,14 +73,14 @@ for py in python3.14 python3.13 python3.12 python3; do
 done
 
 if [ -z "${LAST30DAYS_PYTHON:-}" ]; then
-  echo "ERROR: last30days v3 requires Python 3.12+. Install python3.12 or python3.13 and rerun." >&2
+  echo "ERROR: last30days-crypto requires Python 3.12+. Install python3.12 or python3.13 and rerun." >&2
   exit 1
 fi
 ```
 
 ## Step 0: First-Run Setup Wizard
 
-**CRITICAL: ALWAYS execute Step 0 BEFORE Step 1, even if the user provided a topic.** If the user typed `/last30days Mercer Island`, you MUST check for FIRST_RUN and present the wizard BEFORE running research. The topic "Mercer Island" is preserved — research runs immediately after the wizard completes. Do NOT skip the wizard because a topic was provided. The wizard takes 10 seconds and only runs once ever.
+**CRITICAL: ALWAYS execute Step 0 BEFORE Step 1, even if the user provided a topic.** If the user typed `/last30days-crypto $HYPE`, you MUST check for FIRST_RUN and present the wizard BEFORE running research. The topic "$HYPE" is preserved — research runs immediately after the wizard completes. Do NOT skip the wizard because a topic was provided. The wizard takes 10 seconds and only runs once ever.
 
 To detect first run: check if `~/.config/last30days/.env` exists. If it does NOT exist, this is a first run. **Do NOT run any Bash commands or show any command output to detect this — just check the file existence silently.** If the file exists and contains `SETUP_COMPLETE=true`, skip this section **silently** and proceed to Step 1. **Do NOT say "Setup is complete" or any other status message — just move on.** The user doesn't need to be told setup is done every time they run the skill.
 
@@ -106,30 +101,32 @@ Run environment detection first:
 Read the JSON output. It tells you what's already configured. Display a status summary:
 
 ```
-👋 Welcome to /last30days!
+👋 Welcome to /last30days-crypto!
 
 Detected:
-{✅ or ❌} yt-dlp (YouTube search)
-{✅ or ❌} X/Twitter ({method} configured)
-{✅ or ❌} ScrapeCreators (TikTok, Instagram, Reddit backup)
-{✅ or ❌} Web search ({backend} configured)
+{✅ or ❌} X/Twitter ({method} configured) — primary source
+{✅ or ❌} Web search ({backend} configured) — secondary qualitative source
+{✅ or ❌} CoinGecko (market data)
+{✅ or ❌} Messari (on-chain & derivatives)
+{✅ or ❌} LunarCrush (social-quant)
+{✅ or ❌} Firecrawl (URL scraping)
 ```
 
 Then for each missing item, offer setup in priority order:
 
-1. **ScrapeCreators** (if not configured): "ScrapeCreators adds TikTok and Instagram search (plus a Reddit backup if public Reddit gets rate-limited). 10,000 free calls, no credit card. (No referrals, no kickbacks - we don't get a cut.)"
-   - Option A: "ScrapeCreators via GitHub (recommended)" -- Check if `gh` CLI was detected in the environment detection output above. If gh IS detected: description should say "Registers directly via GitHub CLI in ~2 seconds - no browser needed". Before running the command, display: "Registering via GitHub CLI..." If gh is NOT detected: description should say "Copies a one-time code to your clipboard and opens GitHub to authorize". Before running the command, display: "I'll copy a one-time code to your clipboard and open GitHub. When GitHub asks for a device code, just paste (Cmd+V / Ctrl+V)." Then run `"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" setup --github`, parse JSON output. Tries PAT first (if `gh` is installed), falls back to device flow which copies a one-time code to your clipboard and opens your browser. If `status` is `success`, write `SCRAPECREATORS_API_KEY={api_key}` to .env.
-   - Option B: "I have a key" -- accept paste, write to .env
+1. **X/Twitter** (if not configured): "X is the primary source for crypto research — most signal lives there. To unlock X: add AUTH_TOKEN+CT0 (browser cookies) or XAI_API_KEY (no browser access, api.x.ai)."
+   - Option A: "I have AUTH_TOKEN + CT0 from my browser" — accept both, write to .env
+   - Option B: "I have an xAI API key" (recommended for servers — persistent, no expiry). Write XAI_API_KEY to .env.
    - Option C: "Skip for now"
 
-2. **X/Twitter** (if not configured): "X search finds tweets and conversations. To unlock X: add FROM_BROWSER=auto (reads browser cookies, free), XAI_API_KEY (no browser access, api.x.ai), or AUTH_TOKEN+CT0 (manual cookies)."
-   - Option A: "I have an xAI API key" (recommended for servers -- persistent, no expiry). Write XAI_API_KEY to .env.
-   - Option B: "I have AUTH_TOKEN + CT0 from my browser" -- accept both, write to .env
-   - Option C: "Skip for now"
+2. **Web search** (if no Brave/Exa/Serper key): "A web search key enables grounded news, blog, and doc results. Brave is free for 2,000 queries/month at brave.com/search/api. Exa is 1K free/month at exa.ai. Serper is generous free tier at serper.dev."
 
-3. **YouTube** (if yt-dlp not found): "YouTube search needs yt-dlp. Run: `pip install yt-dlp`"
+3. **Crypto Data APIs** (if any of the three keys are missing): "Crypto research benefits enormously from market, on-chain, and social-quant data. All three are free tier."
+   - **CoinGecko** (`COINGECKO_API_KEY`) — price, market cap, %-changes, volume, top exchanges, community size. Pro key (required) at coingecko.com/api.
+   - **Messari** (`MESSARI_API_KEY`) — futures volume, open interest, funding rate, volatility, project profile. Free at messari.io/api.
+   - **LunarCrush** (`LUNARCRUSH_API_KEY`) — Galaxy Score, AltRank, sentiment, top influencers, AI bull/bear themes. Free Discover tier (10 req/min, 2K/day) at lunarcrush.com/developers.
 
-4. **Web search** (if no Brave/Exa/Serper key): "A web search key enables smarter results. Brave Search is free for 2,000 queries/month at brave.com/search/api"
+4. **Firecrawl** (`FIRECRAWL_API_KEY`, optional) — fallback URL scraper for whitepapers, governance posts, deep blog content. Free tier at firecrawl.dev.
 
 After setup, write `SETUP_COMPLETE=true` to .env and proceed to research.
 
@@ -143,25 +140,24 @@ After setup, write `SETUP_COMPLETE=true` to .env and proceed to research.
 
 **Step 1: Display the following welcome text ONCE as a normal message (not blockquoted). Then IMMEDIATELY call AskUserQuestion - do NOT repeat any of the welcome text inside the AskUserQuestion call.**
 
-Welcome to /last30days!
+Welcome to /last30days-crypto!
 
-I research any topic across Reddit, X, YouTube, and other sources - synthesizing what people are actually saying right now.
+I research crypto topics across Twitter/X (primary), web, and three crypto data APIs (CoinGecko, Messari, LunarCrush) — synthesizing what crypto Twitter is saying alongside market, on-chain, and social-quant data.
 
-Auto setup gives you 5 core sources for free in 30 seconds:
-- X/Twitter - reads your x.com browser cookies to authenticate (not saved to disk). Chrome on macOS will prompt for Keychain access.
-- Reddit with comments - public JSON, no API key needed
-- YouTube search + transcripts - installs yt-dlp (open source, 190K+ GitHub stars)
-- Hacker News + Polymarket + GitHub (if `gh` CLI installed) - always on, zero config
+Auto setup gets X working in 30 seconds:
+- X/Twitter — reads your x.com browser cookies to authenticate (not saved to disk). Chrome on macOS will prompt for Keychain access.
+- Web search — Brave/Exa/Serper key for grounded news, blogs, docs (always on if any key is configured)
+- Hacker News + GitHub (if `gh` CLI installed) + Reddit — tertiary, always on with zero config
 
-Want TikTok and Instagram too? ScrapeCreators adds those (10,000 free calls, scrapecreators.com). No kickbacks, no affiliation.
+Crypto data APIs (recommended — all free tier): CoinGecko (market), Messari (on-chain & derivatives), LunarCrush (Galaxy Score, sentiment, top influencers). Optional: Firecrawl for URL scraping.
 
 **Then call AskUserQuestion with ONLY this question and these options - no additional text:**
 
 Question: "How would you like to set up?"
 Options:
-- "Auto setup (~30 seconds) - scans browser cookies for X + installs yt-dlp for YouTube"
+- "Auto setup (~30 seconds) - scans browser cookies for X"
 - "Manual setup - show me what to configure"
-- "Skip for now - Reddit (with comments), HN, Polymarket, GitHub (if gh installed), Web"
+- "Skip for now - HN, GitHub (if gh installed), Reddit, and Web (if web key already set)"
 
 **If the user picks 1 (Auto setup):**
 
@@ -173,92 +169,85 @@ If `BROWSER_CONSENT=true` is NOT present, **call AskUserQuestion:**
 Question: "Auto setup will scan your browser for x.com cookies to authenticate X search. Cookies are read live, not saved to disk. Chrome on macOS will prompt for Keychain access. OK to proceed?"
 Options:
 - "Yes, scan my cookies for X" - Run setup as normal. Append `BROWSER_CONSENT=true` to .env after setup completes.
-- "Skip X, just set up YouTube" - Run setup with YouTube only (install yt-dlp). Do not scan cookies.
-- "I have an xAI API key instead" - Ask them to paste it, write XAI_API_KEY to .env. Then install yt-dlp.
+- "Skip X scan, I'll set keys manually" - Skip cookie scan; user will configure X keys (XAI_API_KEY or AUTH_TOKEN+CT0) manually.
+- "I have an xAI API key instead" - Ask them to paste it, write XAI_API_KEY to .env.
 
 Run the setup subcommand:
 ```bash
 cd {SKILL_DIR} && "${LAST30DAYS_PYTHON}" scripts/last30days.py setup
 ```
-Show the user the results (what cookies were found, whether yt-dlp was installed).
+Show the user the results (what cookies were found).
 
-**Then show the optional ScrapeCreators offer (plain text, then modal):**
+**Then show the Crypto Data Setup modal (plain text, then modal):**
 
-Want TikTok and Instagram too? ScrapeCreators adds those platforms - 10,000 free calls, no credit card. It also serves as a Reddit backup if public Reddit ever gets rate-limited.
-
-**Before showing the ScrapeCreators modal, check for `gh` CLI:** Run `which gh` via Bash silently. Store the result as gh_available (true if found, false if not).
+Crypto research benefits enormously from market, on-chain, and social-quant data. CoinGecko gives you price/marketcap/volume; Messari gives you derivatives positioning (OI, funding, volatility); LunarCrush gives you Galaxy Score, AltRank, sentiment trend, and top influencers. All three are free tier.
 
 **Call AskUserQuestion:**
-Question: "Want to add TikTok, Instagram, and Reddit backup via ScrapeCreators? (We don't get a cut.)"
+Question: "Want to add the crypto data APIs? (CoinGecko / Messari / LunarCrush — all free tier.)"
 Options:
-- "ScrapeCreators via GitHub (fastest, recommended)" - If gh_available: description should say "Registers directly via GitHub CLI in ~2 seconds - no browser needed". If NOT gh_available: description should say "Copies a one-time code to your clipboard and opens GitHub to authorize". After the user selects this option: If gh_available, display "Registering via GitHub CLI..." before running the command. If NOT gh_available, display "I'll copy a one-time code to your clipboard and open GitHub. When GitHub asks for a device code, just paste (Cmd+V on Mac, Ctrl+V on Windows/Linux)." Then run `cd {SKILL_DIR} && "${LAST30DAYS_PYTHON}" scripts/last30days.py setup --github` via Bash with a 5-minute timeout. This tries PAT auth first (if `gh` CLI is installed, zero browser needed), then falls back to GitHub device flow which copies a one-time code to your clipboard and opens GitHub in your browser. Parse the JSON stdout. If `status` is `success`, write `SCRAPECREATORS_API_KEY={api_key}` to `~/.config/last30days/.env`. If `method` is `pat`, show: "You're in! Registered via GitHub CLI - zero browser needed. 10,000 free calls. TikTok, Instagram, and Reddit backup are now active." If `method` is `device` and `clipboard_ok` is true, show: "You're in! (The authorization code was copied to your clipboard automatically.) 10,000 free calls. TikTok, Instagram, and Reddit backup are now active." If `method` is `device` and `clipboard_ok` is false, show: "You're in! 10,000 free calls. TikTok, Instagram, and Reddit backup are now active." If `status` is `timeout` or `error`, show: "GitHub auth didn't complete. No worries - you can sign up at scrapecreators.com instead or try again later." Then offer the web signup option.
-- "Open scrapecreators.com (Google sign-in)" - run `open https://scrapecreators.com` via Bash to open in the user's browser. Then ask them to paste the API key they get. When they paste it, write SCRAPECREATORS_API_KEY={key} to ~/.config/last30days/.env
-- "I have a key" - accept the key, write to .env
-- "Skip for now" - proceed without ScrapeCreators
+- "I have keys to paste" — Accept the three keys (any subset; ask one by one). Write `COINGECKO_API_KEY={k}`, `MESSARI_API_KEY={k}`, `LUNARCRUSH_API_KEY={k}` to `~/.config/last30days/.env`. Confirm what was added.
+- "Open all three signup pages" — Run `open https://www.coingecko.com/en/api/pricing` and `open https://messari.io/api` and `open https://lunarcrush.com/developers` via Bash. Tell user to paste keys when ready.
+- "Skip for now — I'll add them later" — proceed without crypto data. Note: research without these keys will still run on X/web but skip the Market & On-chain section.
 
-**After SC key is saved (not if skipped), show the TikTok/Instagram opt-in:**
-
-Your ScrapeCreators key powers TikTok, Instagram, Threads, Pinterest, and YouTube comments. Want those on for every research run? (Each additional source uses a ScrapeCreators call per search.)
+**After crypto setup (or skip), optionally offer Firecrawl:**
 
 **Call AskUserQuestion:**
-Question: "Which ScrapeCreators sources do you want on?"
+Question: "Add Firecrawl for URL scraping? (Used as a fallback when grounding snippets are too thin — whitepapers, governance posts, deep blog content.)"
 Options:
-- "TikTok + Instagram (recommended)" - append `INCLUDE_SOURCES=tiktok,instagram` to ~/.config/last30days/.env. Confirm: "TikTok and Instagram are on, plus Reddit backup if public Reddit has issues. You can add threads, pinterest, youtube_comments to INCLUDE_SOURCES anytime."
-- "Everything - TikTok, Instagram, Threads, Pinterest, YouTube comments" - append `INCLUDE_SOURCES=tiktok,instagram,threads,pinterest,youtube_comments` to ~/.config/last30days/.env. Confirm: "All ScrapeCreators sources are on."
-- "Just the basics - let's run our first search" - don't write the flag. Confirm: "Got it. ScrapeCreators will serve as Reddit backup. You can add sources to INCLUDE_SOURCES in your .env anytime."
+- "I have a Firecrawl key" — accept, write `FIRECRAWL_API_KEY={k}` to .env.
+- "Open firecrawl.dev signup" — Run `open https://firecrawl.dev` via Bash.
+- "Skip for now"
 
-**After TikTok/Instagram opt-in (or SC skip), show the first research topic modal:**
+**After Firecrawl (or skip), show the first research topic modal:**
 
 **Call AskUserQuestion:**
 Question: "What do you want to research first?"
 Options:
-- "Claude Code vs Codex" - tech comparison
-- "Sam Altman" - person in the news
-- "Warriors Basketball" - sports
-- "AI Legal Prompting Techniques" - niche/professional
+- "$HYPE Hyperliquid this week" — token-specific deep dive
+- "New memecoin launches on Solana" — narrative/category research
+- "Bitcoin ETF flows and price action" — market + macro
+- "AI agent token landscape" — sector/thesis research
 - "Type my own topic"
 
-If user picks an example, run research with that topic. If they pick "Type my own", ask them what they want to research. If the user originally provided a topic with the command (e.g., `/last30days Mercer Island`), skip this modal and use their topic directly.
+If user picks an example, run research with that topic. If they pick "Type my own", ask them what they want to research. If the user originally provided a topic with the command (e.g., `/last30days-crypto $HYPE`), skip this modal and use their topic directly.
 
-**END OF FIRST-RUN WIZARD. Everything above in Step 0 ONLY runs on first run. If SETUP_COMPLETE=true exists in .env, skip ALL of Step 0 — no welcome, no setup, no ScrapeCreators modal, no topic picker. Go directly to Step 1 (Parse User Intent). The topic picker is ONLY for first-time users who haven't run /last30days before.**
+**END OF FIRST-RUN WIZARD. Everything above in Step 0 ONLY runs on first run. If SETUP_COMPLETE=true exists in .env, skip ALL of Step 0 — no welcome, no setup, no ScrapeCreators modal, no topic picker. Go directly to Step 1 (Parse User Intent). The topic picker is ONLY for first-time users who haven't run /last30days-crypto before.**
 
 **If the user picks 2 (Manual setup):**
 Show them this guide (present as plain text, not blockquoted):
 
-The magic of /last30days is Reddit comments + X posts together - and both are free. Here's how to unlock each source.
+The magic of /last30days-crypto is X/Twitter posts + crypto data APIs together. Here's how to unlock each source.
 
 Add these to `~/.config/last30days/.env`:
 
-X/Twitter (pick one - this is the most important):
-- `FROM_BROWSER=auto` - free. Reads your x.com login cookies at search time to authenticate. Cookies are read live each run, not saved to disk. Chrome on macOS will prompt for Keychain access the first time. Firefox and Safari don't.
-- `XAI_API_KEY=xxx` - no browser access needed. Get a key at api.x.ai. Best for servers or if you don't want cookie scanning.
-- `AUTH_TOKEN=xxx` + `CT0=xxx` - paste your X cookies manually (x.com -> F12 -> Application -> Cookies)
+X/Twitter (pick one — this is the primary source):
+- `AUTH_TOKEN=xxx` + `CT0=xxx` — paste your X cookies manually (x.com -> F12 -> Application -> Cookies). Recommended for the best signal.
+- `XAI_API_KEY=xxx` — no browser access needed. Get a key at api.x.ai. Best for servers.
+
+Crypto Data APIs (highly recommended — all free tier):
+- `COINGECKO_API_KEY=xxx` — Pro key at coingecko.com/api. Price, market cap, %-changes, volume, top exchanges, community size, developer activity.
+- `MESSARI_API_KEY=xxx` — free key at messari.io/api. Futures volume, open interest, funding rate, volatility, project profile, ATH/ROI.
+- `LUNARCRUSH_API_KEY=xxx` — free Discover tier (10 req/min, 2K/day) at lunarcrush.com/developers. Galaxy Score, AltRank, sentiment, AI bull/bear themes, top influencers, social time-series.
+
+Web search (highly recommended — secondary qualitative source):
+- `BRAVE_API_KEY=xxx` — Brave Search, 2,000 free queries/month at brave.com/search/api.
+- `EXA_API_KEY=xxx` — semantic web search, 1K free/month at exa.ai.
+- `SERPER_API_KEY=xxx` — generous free tier at serper.dev.
+- `PARALLEL_API_KEY=xxx` — alternative web backend.
+
+Optional: Firecrawl (URL scraper):
+- `FIRECRAWL_API_KEY=xxx` — fallback for whitepapers, governance posts, deep blog content. Free tier at firecrawl.dev.
+
+Optional: Perplexity Sonar (AI-synthesized research via OpenRouter):
+- `OPENROUTER_API_KEY=xxx` — adds AI-synthesized crypto research with citations. ~$0.02/run.
+- After adding the key, set `INCLUDE_SOURCES=perplexity`.
+- Use `--deep-research` flag for exhaustive 50+ citation reports (~$0.90/query).
+
+Optional: GitHub Issues/PRs (free, no key needed):
+- If you have the `gh` CLI installed (`brew install gh`), GitHub search is automatic. Useful for protocol/infra topics. No API key required.
 
 Reddit (free, works out of the box):
-- Public JSON gives you threads + top comments with upvote counts. No setup required.
-- `SCRAPECREATORS_API_KEY=xxx` - optional backup source if public Reddit gets rate-limited.
-- `OPENAI_API_KEY=xxx` - optional fallback if public Reddit search has trouble finding threads.
-
-YouTube (free, open source):
-- Run `brew install yt-dlp` - free, open source, 190K+ GitHub stars. Enables YouTube search and transcripts.
-
-Bonus: TikTok, Instagram, Threads, Pinterest, YouTube comments (ScrapeCreators):
-- `SCRAPECREATORS_API_KEY=xxx` - 10,000 free calls at scrapecreators.com.
-- After adding your key, set `INCLUDE_SOURCES=tiktok,instagram` to turn on the most popular ones. Add threads, pinterest, youtube_comments for more.
-
-GitHub Issues/PRs (free, no key needed):
-- If you have the `gh` CLI installed (`brew install gh`), GitHub search is automatic. No API key required.
-
-Perplexity Sonar Pro (AI-synthesized research via OpenRouter):
-- `OPENROUTER_API_KEY=xxx` - adds AI-synthesized research with citations as an additive source alongside Reddit/X/YouTube. Returns structured narratives with specific dates, names, and numbers that social sources miss. ~$0.02/run.
-- After adding your key, set `INCLUDE_SOURCES=perplexity` (or append to existing, e.g. `INCLUDE_SOURCES=tiktok,instagram,perplexity`).
-- Use `--deep-research` flag for exhaustive 50+ citation reports (~$0.90/query) on topics that need serious investigation.
-- Bonus: also powers the planning and reranking engine if you don't have a Gemini/OpenAI/xAI key.
-
-Other bonus sources (add anytime):
-- `EXA_API_KEY=xxx` - semantic web search, 1K free/month (exa.ai)
-- `BSKY_HANDLE=you.bsky.social` + `BSKY_APP_PASSWORD=xxx` - Bluesky (free app password)
-- `BRAVE_API_KEY=xxx` - Brave web search
+- Public JSON gives you threads + top comments. No setup required. Used as a tertiary qualitative source.
 
 Always add this last line: `SETUP_COMPLETE=true`
 
@@ -278,43 +267,46 @@ Options:
 **If the user picks "Open .env in editor":**
 Create `~/.config/last30days/.env` if it doesn't exist (check first!), pre-populated with this template:
 ```
-# /last30days configuration
+# /last30days-crypto configuration
 # Uncomment and fill in the keys you want to use.
 
-# X/Twitter (pick one):
-# FROM_BROWSER=auto          # Free. Reads x.com cookies from your browser at search time.
-#                             # Chrome on macOS prompts for Keychain access. Firefox/Safari don't.
-# XAI_API_KEY=               # No browser access. Get a key at api.x.ai
+# X/Twitter (PRIMARY source — pick one):
 # AUTH_TOKEN=                 # Manual: x.com -> F12 -> Application -> Cookies
 # CT0=                        # (requires AUTH_TOKEN too)
+# XAI_API_KEY=               # No browser access. Get a key at api.x.ai
 
-# ScrapeCreators (10,000 free calls - scrapecreators.com):
-# SCRAPECREATORS_API_KEY=    # Unlocks: TikTok, Instagram, Reddit backup (if public Reddit gets rate-limited)
-#                             # Optional: add threads, pinterest, youtube_comments for more
-# INCLUDE_SOURCES=tiktok,instagram
+# Crypto Data APIs (highly recommended — all free tier):
+# COINGECKO_API_KEY=          # Pro key at coingecko.com/api
+# MESSARI_API_KEY=            # Free at messari.io/api
+# LUNARCRUSH_API_KEY=         # Free Discover tier at lunarcrush.com/developers
 
-# YouTube: install yt-dlp (brew install yt-dlp) - no key needed
+# Optional: Firecrawl (URL scraper for whitepapers, governance posts):
+# FIRECRAWL_API_KEY=          # Free tier at firecrawl.dev
 
-# Bluesky:
-# BSKY_HANDLE=you.bsky.social
-# BSKY_APP_PASSWORD=
-
-# Web search:
+# Web search (recommended — secondary qualitative source):
 # BRAVE_API_KEY=              # 2,000 free queries/month at brave.com/search/api
-# OPENROUTER_API_KEY=         # Perplexity Sonar via OpenRouter
+# EXA_API_KEY=                # 1K free/month at exa.ai
+# SERPER_API_KEY=             # Generous free tier at serper.dev
+
+# Optional: Perplexity Sonar via OpenRouter (~$0.02/run):
+# OPENROUTER_API_KEY=
+# INCLUDE_SOURCES=perplexity
+
+# Optional: GitHub (auto-detected if `gh` CLI is installed)
+# GITHUB_TOKEN=
 
 SETUP_COMPLETE=true
 ```
 If the file already exists, do NOT overwrite it. Just open it.
 Run `open ~/.config/last30days/.env` on macOS to open in the default editor.
-Then tell the user: "Your .env is open. Edit it, save, and run /last30days again."
+Then tell the user: "Your .env is open. Edit it, save, and run /last30days-crypto again."
 
-**If the user picks "Paste keys here"**, write them to `~/.config/last30days/.env` (create the file and parent dirs if needed, append without overwriting existing keys, always include `SETUP_COMPLETE=true`). If a SCRAPECREATORS_API_KEY was included, also append `INCLUDE_SOURCES=tiktok,instagram` and tell the user: "TikTok, Instagram, and Reddit backup are now on. Want to also add Threads, Pinterest, or YouTube comments? Add them to INCLUDE_SOURCES in your .env." Then offer the same ScrapeCreators sources opt-in modal as the auto-setup path (the "Which ScrapeCreators sources do you want on?" question above). Then proceed with research.
+**If the user picks "Paste keys here"**, write them to `~/.config/last30days/.env` (create the file and parent dirs if needed, append without overwriting existing keys, always include `SETUP_COMPLETE=true`). If any of `COINGECKO_API_KEY`/`MESSARI_API_KEY`/`LUNARCRUSH_API_KEY` are included, confirm: "Crypto data APIs are now on. The Market & On-chain section will appear in every research run that mentions a token." Then proceed with research.
 
-**If the user picks "I'll do it myself"**, tell them: "Save the file at `~/.config/last30days/.env`, then run `/last30days <topic>` to research anything." Then proceed with research using whatever sources are currently available.
+**If the user picks "I'll do it myself"**, tell them: "Save the file at `~/.config/last30days/.env`, then run `/last30days-crypto <topic>` to research anything." Then proceed with research using whatever sources are currently available.
 
 **If the user picks Skip:**
-Proceed with research immediately using the user's original topic. Do NOT create or modify the .env file when the user picks Skip. Note: without setup, sources are limited to Reddit (threads and comments), HN, Polymarket, and GitHub (if `gh` CLI installed). X/Twitter and YouTube require setup.
+Proceed with research immediately using the user's original topic. Do NOT create or modify the .env file when the user picks Skip. Note: without setup, sources are limited to HN, GitHub (if `gh` CLI installed), Reddit, and Web (if any web key is already set). X/Twitter and crypto-data APIs require setup.
 
 ---
 
@@ -322,19 +314,16 @@ Proceed with research immediately using the user's original topic. Do NOT create
 
 When users ask about API keys, setup, or how to unlock more sources, reference this:
 
-You do NOT need API keys to use last30days. It works out of the box with Reddit (threads and comments), Hacker News, Polymarket, and GitHub (if `gh` CLI installed). Browser cookies for X/Twitter are equivalent to an API key - just log into x.com in any browser and last30days will find your session automatically.
+You technically can use last30days-crypto without keys, but for crypto research you'll want X/Twitter and the three crypto data APIs configured. Without them, the skill falls back to HN/GitHub/Reddit + web — useful for narrative discovery but missing the market and on-chain signal.
 
-Source unlock progression (all free):
-- Zero config (40% quality): Reddit (threads + comments), HN, Polymarket, GitHub (if `gh` installed) - works immediately
-- + X cookies (60%): Log into x.com in any browser. last30days scans your cookies automatically. No signup required.
-- + yt-dlp (80%): `brew install yt-dlp` - open source, 190K+ GitHub stars. Enables YouTube search and transcripts.
-- Auto setup does both X cookies + yt-dlp in 30 seconds.
-- Full free tier (80%): X + Reddit (with comments) + YouTube + HN + Polymarket + GitHub (if `gh` CLI installed)
-- + ScrapeCreators (100%): Adds TikTok, Instagram, and a Reddit backup. 10,000 free API calls, no credit card - scrapecreators.com. It's a bonus, not a requirement.
+Source unlock progression (all free tier):
+- Zero config (30% quality): HN, Reddit, GitHub (if `gh` installed), Web (if a web key is already set) — narrative-only
+- + X cookies (60%): paste `AUTH_TOKEN` + `CT0` from your x.com browser cookies, or use `XAI_API_KEY`. X is the primary source for crypto research.
+- + Web search key (75%): `BRAVE_API_KEY` / `EXA_API_KEY` / `SERPER_API_KEY` — adds grounded news, blogs, docs.
+- + Crypto data APIs (95%): `COINGECKO_API_KEY` (price, marketcap, exchanges), `MESSARI_API_KEY` (futures, OI, funding, volatility), `LUNARCRUSH_API_KEY` (Galaxy Score, AltRank, sentiment, top influencers). All free tier.
+- + Firecrawl (100%): `FIRECRAWL_API_KEY` for whitepapers, governance posts, deep blog content. Free tier.
 
-Key comparison: X browser cookies = same access as an API key (free, no signup). ScrapeCreators adds TikTok and Instagram for users who want those platforms.
-
-last30days has no affiliation with any API provider - no referrals, no kickbacks.
+last30days-crypto has no affiliation with any API provider — no referrals, no kickbacks.
 
 ---
 
@@ -387,12 +376,12 @@ Then display (use "and more" if 5+ sources, otherwise list all with Oxford comma
 
 For GENERAL / NEWS / RECOMMENDATIONS / PROMPTING queries:
 ```
-/last30days — searching {ACTIVE_SOURCES_LIST} for what people are saying about {TOPIC}.
+/last30days-crypto — searching {ACTIVE_SOURCES_LIST} for what people are saying about {TOPIC}.
 ```
 
 For COMPARISON queries:
 ```
-/last30days — comparing {TOPIC_A} vs {TOPIC_B} across {ACTIVE_SOURCES_LIST}.
+/last30days-crypto — comparing {TOPIC_A} vs {TOPIC_B} across {ACTIVE_SOURCES_LIST}.
 ```
 
 Do NOT show a multi-line "Parsed intent" block with TOPIC=, TARGET_TOOL=, QUERY_TYPE= variables. Do NOT promise a specific time. Do NOT list sources that aren't configured.
@@ -522,7 +511,7 @@ Store: `RESOLVED_GITHUB_REPOS = {comma-separated owner/repo or empty}`
 
 ## Agent Mode (--agent flag)
 
-If `--agent` appears in ARGUMENTS (e.g., `/last30days plaud granola --agent`):
+If `--agent` appears in ARGUMENTS (e.g., `/last30days-crypto $HYPE momentum --agent`):
 
 1. **Skip** the intro display block ("I'll research X across Reddit...")
 2. **Skip** any `AskUserQuestion` calls - use `TARGET_TOOL = "unknown"` if not specified
@@ -735,11 +724,10 @@ for dir in \
   "." \
   "${CLAUDE_PLUGIN_ROOT:-}" \
   "${GEMINI_EXTENSION_DIR:-}" \
-  "$HOME/.claude/plugins/marketplaces/last30days-skill-private" \
-  "$HOME/.claude/plugins/cache/last30days-skill-private/last30days-3-nogem/3.0.0-nogem" \
-  "$HOME/.claude/plugins/cache/last30days-skill-private/last30days-3/3.0.0-alpha" \
-  "$HOME/.claude/skills/last30days-3-nogem" \
-  "$HOME/.claude/skills/last30days-3"; do
+  "$HOME/.claude/plugins/marketplaces/last30days-crypto" \
+  "$HOME/.claude/plugins/marketplaces/last30days-skill" \
+  "$HOME/.claude/plugins/cache/last30days-crypto-private/last30days-crypto/3.0.0-alpha" \
+  "$HOME/.claude/skills/last30days-crypto"; do
   [ -n "$dir" ] && [ -f "$dir/scripts/last30days.py" ] && SKILL_ROOT="$dir" && break
 done
 
@@ -1207,8 +1195,8 @@ I'm now an expert on {TOPIC}. Some things you could ask:
 ```
 ---
 I've compared {TOPIC_A} vs {TOPIC_B} using the latest community data. Some things you could ask:
-- [Deep dive into {TOPIC_A} alone with /last30days {TOPIC_A}]
-- [Deep dive into {TOPIC_B} alone with /last30days {TOPIC_B}]
+- [Deep dive into {TOPIC_A} alone with /last30days-crypto {TOPIC_A}]
+- [Deep dive into {TOPIC_B} alone with /last30days-crypto {TOPIC_B}]
 - [Focus on a specific dimension from the comparison table]
 - [Look at a different time period with --days=7 or --days=90]
 ```
@@ -1224,25 +1212,23 @@ I'm now an expert on {TOPIC}. Some things I can help with:
 
 **Example invitations (to show the quality bar):**
 
-For `/last30days nano banana pro prompts for Gemini`:
-> I'm now an expert on Nano Banana Pro for Gemini. What do you want to make? For example:
-> - Photorealistic product shots with natural lighting (the most requested style right now)
-> - Logo designs with embedded text (Gemini's new strength per the research)
-> - Multi-reference style transfer from a mood board
->
-> Just describe your vision and I'll write a prompt you can paste straight into Gemini.
+For `/last30days-crypto $HYPE Hyperliquid momentum` (TOKEN):
+> I'm now an expert on $HYPE this month. Some things I can help with:
+> - Walk through the bull case vs bear case from CT and the funding rate signal
+> - Compare HIP-3 vs HIP-4 narratives and which one CT is leaning into
+> - Map the top 5 influencers I surfaced — who's calling tops, who's calling continuation
 
-For `/last30days kanye west` (GENERAL):
-> I'm now an expert on Kanye West. Some things I can help with:
-> - What's the real story behind the apology letter — genuine or PR move?
-> - Break down the BULLY tracklist reactions and what fans are expecting
-> - Compare how Reddit vs X are reacting to the Bianca narrative
+For `/last30days-crypto Solana memecoin launches` (NARRATIVE):
+> I'm now an expert on the current Solana memecoin cycle. Some things you could ask:
+> - What's the typical rug pattern this round vs last cycle?
+> - Which launchpads / pump.fun cohorts surfaced and what's their sustained-volume profile?
+> - Draft a watchlist with entry/exit triggers based on what survived the last 30 days
 
-For `/last30days war in Iran` (NEWS):
-> I'm now an expert on the Iran situation. Some things you could ask:
-> - What are the realistic escalation scenarios from here?
-> - How is this playing differently in US vs international media?
-> - What's the economic impact on oil markets so far?
+For `/last30days-crypto $BTC vs $ETH 30d --deep` (COMPARISON):
+> I'm now an expert on the BTC vs ETH 30d picture. Some things to ask:
+> - Reconcile the on-chain (Messari OI/funding) vs social-quant (LunarCrush sentiment) signals
+> - Which catalysts in the last 30 days actually moved price vs which were noise?
+> - Build a 1-week thesis tree with the key X accounts to watch on each side
 
 I have all the links to the {N} {source list} I pulled from. Just ask.
 
