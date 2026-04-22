@@ -7,11 +7,9 @@ from collections import Counter
 from . import dates, schema
 
 SOURCE_LABELS = {
-    "grounding": "Web",
-    "hackernews": "Hacker News",
     "x": "X",
+    "grounding": "Web",
     "github": "GitHub",
-    "perplexity": "Perplexity",
     "coingecko": "CoinGecko",
     "messari": "Messari",
     "lunarcrush": "LunarCrush",
@@ -139,7 +137,7 @@ def render_full(report: schema.Report) -> str:
     # ALL items by source (flat dump, v2-style)
     lines.append("## All Items by Source")
     lines.append("")
-    source_order = ["x", "grounding", "perplexity", "hackernews", "github", "reddit",
+    source_order = ["x", "grounding", "github",
                     "coingecko", "messari", "lunarcrush"]
     for source in source_order:
         items = report.items_by_source.get(source, [])
@@ -377,8 +375,6 @@ def _format_date(item: schema.SourceItem | None) -> str:
 def _format_actor(item: schema.SourceItem | None) -> str | None:
     if not item:
         return None
-    if item.source == "reddit" and item.container:
-        return f"r/{item.container}"
     if item.source == "x" and item.author:
         return f"@{item.author.lstrip('@')}"
     if item.source == "lunarcrush" and item.author:
@@ -392,11 +388,8 @@ def _format_actor(item: schema.SourceItem | None) -> str | None:
 
 # Per-source engagement display fields: list of (field_name, label) tuples.
 ENGAGEMENT_DISPLAY: dict[str, list[tuple[str, str]]] = {
-    "reddit":       [("score", "pts"), ("num_comments", "cmt")],
     "x":            [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
-    "hackernews":   [("points", "pts"), ("comments", "cmt")],
     "github":       [("reactions", "react"), ("comments", "cmt")],
-    "perplexity":   [("citations", "cite")],
     "lunarcrush":   [("interactions_24h", "ints"), ("creator_followers", "flrs")],
 }
 
@@ -459,9 +452,7 @@ def _top_actor_summary(source: str, items: list[schema.SourceItem]) -> str | Non
     if not actors:
         return None
     label = {
-        "reddit": "communities",
         "grounding": "domains",
-        "hackernews": "domains",
     }.get(source, "voices")
     return f"{label}: {', '.join(actors)}"
 
@@ -486,8 +477,6 @@ def _top_voices_overall(items_by_source: dict[str, list[schema.SourceItem]], lim
 
 
 def _stats_actor(item: schema.SourceItem) -> str | None:
-    if item.source == "reddit" and item.container:
-        return f"r/{item.container}"
     if item.source == "x" and item.author:
         return f"@{item.author.lstrip('@')}"
     if item.source == "lunarcrush" and item.author:
@@ -577,9 +566,6 @@ def _render_best_takes(candidates, limit=5, threshold=70.0):
         source_label = _source_label(candidate.source)
         author = candidate.source_items[0].author if candidate.source_items else None
         attribution = f"@{author} on {source_label}" if author and candidate.source in ("x", "lunarcrush") else f"{source_label}"
-        if author and candidate.source == "reddit":
-            container = candidate.source_items[0].container if candidate.source_items else None
-            attribution = f"r/{container} comment" if container else "Reddit"
         score_tag = f"(fun:{candidate.fun_score:.0f})"
         reason = f" -- {candidate.fun_explanation}" if candidate.fun_explanation and candidate.fun_explanation != "heuristic-fallback" else ""
         lines.append(f'- "{_truncate(text, 280)}" -- {attribution} {score_tag}{reason}')

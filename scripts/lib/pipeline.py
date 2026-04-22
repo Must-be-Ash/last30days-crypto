@@ -20,16 +20,12 @@ from . import (
     firecrawl,
     github,
     grounding,
-    hackernews,
     lunarcrush,
     messari,
     normalize,
-    perplexity,
     planner,
     providers,
     query,
-    reddit,
-    reddit_public,
     rerank,
     schema,
     signals,
@@ -46,7 +42,6 @@ DEPTH_SETTINGS = {
 }
 
 SEARCH_ALIAS = {
-    "hn": "hackernews",
     "web": "grounding",
 }
 
@@ -61,10 +56,7 @@ CRYPTO_ENRICHMENT_SOURCES = {"coingecko", "messari", "lunarcrush"}
 MOCK_AVAILABLE_SOURCES = [
     "x",
     "grounding",
-    "perplexity",
-    "hackernews",
     "github",
-    "reddit",
     "coingecko",
     "messari",
     "lunarcrush",
@@ -89,15 +81,8 @@ def available_sources(config: dict[str, Any], requested_sources: list[str] | Non
         available.append("x")
     if config.get("BRAVE_API_KEY") or config.get("EXA_API_KEY") or config.get("SERPER_API_KEY") or config.get("PARALLEL_API_KEY"):
         available.append("grounding")
-    # Perplexity Sonar: opt-in additive source via INCLUDE_SOURCES=perplexity
-    include_sources = (config.get("INCLUDE_SOURCES") or "").lower().split(",")
-    if config.get("OPENROUTER_API_KEY") and "perplexity" in include_sources:
-        available.append("perplexity")
-    available.append("hackernews")
     if config.get("GITHUB_TOKEN") or which("gh"):
         available.append("github")
-    # Reddit_public needs no API key - tertiary qualitative source.
-    available.append("reddit")
     # Crypto data APIs - additive enrichment sources. Pipeline only invokes
     # them when the planner detects a token mention (Phase 4); listing them
     # here just makes them eligible for selection.
@@ -155,7 +140,6 @@ def run(
     x_related: list[str] | None = None,
     web_backend: str = "auto",
     external_plan: dict | None = None,
-    subreddits: list[str] | None = None,
     lookback_days: int = 30,
     github_user: str | None = None,
     github_repos: list[str] | None = None,
@@ -341,7 +325,6 @@ def run(
                         rate_limit_lock=rate_limit_lock,
                         web_backend=web_backend,
                         raw_topic=topic,
-                        subreddits=subreddits,
                     )
                 ] = (subquery, source)
 
@@ -368,7 +351,6 @@ def run(
                             rate_limit_lock=rate_limit_lock,
                             web_backend=web_backend,
                             raw_topic=topic,
-                            subreddits=subreddits,
                         )
                     except Exception as retry_exc:
                         bundle.errors_by_source[source] = f"{exc} (retried once, still failed: {retry_exc})"
@@ -644,25 +626,13 @@ def _run_supplemental_searches(
         {"author_handle": item.author or "", "text": item.body or ""}
         for item in bundle.items_by_source.get("x", [])
     ]
-    reddit_dicts = [
-        {
-            "subreddit": item.container or "",
-            "comment_insights": item.metadata.get("comment_insights", []),
-            "top_comments": [
-                {"excerpt": c.get("excerpt", c.get("text", ""))}
-                for c in (item.metadata.get("top_comments") or [])
-                if isinstance(c, dict)
-            ],
-        }
-        for item in bundle.items_by_source.get("reddit", [])
-    ]
 
-    if not x_dicts and not reddit_dicts and not x_handle and not x_related:
+    if not x_dicts and not x_handle and not x_related:
         return
 
     entities = entity_extract.extract_entities(
-        reddit_dicts, x_dicts,
-        max_handles=3, max_subreddits=3,
+        [], x_dicts,
+        max_handles=3, max_subreddits=0,
     )
 
     handles = entities.get("x_handles", [])
@@ -882,7 +852,6 @@ def _retrieve_stream(
     rate_limit_lock: threading.Lock | None = None,
     web_backend: str = "auto",
     raw_topic: str = "",
-    subreddits: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
     # Early exit if source was rate-limited by a sibling future
     if rate_limited_sources is not None and source in rate_limited_sources:
@@ -893,44 +862,6 @@ def _retrieve_stream(
     if source == "grounding":
         return grounding.web_search(
             subquery.search_query, date_range, config, backend=web_backend)
-    if source == "reddit":
-        # Use raw_topic so expand_reddit_queries() generates diverse variants
-        # from the original user topic, not the planner's narrowed search_query.
-        reddit_query = raw_topic or subquery.search_query
-        # Public Reddit first (free, gets comments); SC as backup
-        try:
-            public_results = reddit_public.search_reddit_public(
-                reddit_query, from_date, to_date, depth=depth,
-                subreddits=subreddits,
-            )
-            if public_results:
-                return public_results, {}
-        except Exception as exc:
-            sys.stderr.write(
-                f"[Reddit] Public search failed ({type(exc).__name__}: {exc})"
-            )
-            if not config.get("SCRAPECREATORS_API_KEY"):
-                sys.stderr.write("\n")
-                return [], {}
-            sys.stderr.write(", using ScrapeCreators backup\n")
-        # Fallback to ScrapeCreators if public returned empty or raised
-        if config.get("SCRAPECREATORS_API_KEY"):
-            try:
-                result = reddit.search_and_enrich(
-                    reddit_query,
-                    from_date,
-                    to_date,
-                    depth=depth,
-                    token=config.get("SCRAPECREATORS_API_KEY"),
-                    subreddits=subreddits,
-                )
-                return reddit.parse_reddit_response(result), {}
-            except Exception as exc:
-                sys.stderr.write(
-                    f"[Reddit] ScrapeCreators backup also failed "
-                    f"({type(exc).__name__}: {exc})\n"
-                )
-        return [], {}
     if source == "x":
         backend = runtime.x_search_backend or env.get_x_source(config)
         if backend == "bird":
@@ -948,14 +879,9 @@ def _retrieve_stream(
             )
             return xai_x.parse_x_response(result), {}
         raise RuntimeError("No X backend is available.")
-    if source == "hackernews":
-        result = hackernews.search_hackernews(subquery.search_query, from_date, to_date, depth=depth)
-        return hackernews.parse_hackernews_response(result, query=subquery.search_query), {}
     if source == "github":
         result = github.search_github(subquery.search_query, from_date, to_date, depth=depth, token=config.get("GITHUB_TOKEN"))
         return result, {}
-    if source == "perplexity":
-        return perplexity.search(subquery.search_query, date_range, config, deep=config.get("_deep_research", False))
     raise RuntimeError(f"Unsupported source: {source}")
 
 
@@ -967,20 +893,6 @@ def _google_key(config: dict[str, Any]) -> str | None:
 
 def _mock_stream_results(source: str, subquery: schema.SubQuery) -> tuple[list[dict], dict]:
     payloads = {
-        "reddit": [
-            {
-                "id": "R1",
-                "title": f"{subquery.search_query} discussion thread",
-                "url": "https://reddit.com/r/example/comments/1",
-                "subreddit": "example",
-                "date": dates.get_date_range(5)[0],
-                "engagement": {"score": 120, "num_comments": 48, "upvote_ratio": 0.91},
-                "selftext": f"Community discussion about {subquery.search_query}.",
-                "top_comments": [{"excerpt": "Strong firsthand feedback from users."}],
-                "relevance": 0.82,
-                "why_relevant": "Mock Reddit result",
-            }
-        ],
         "x": [
             {
                 "id": "X1",

@@ -37,11 +37,13 @@ CLI flags:
 
 | Tier | Sources |
 |------|---------|
-| Primary qualitative | **X / Twitter** (cookies → XAI fallback) |
-| Secondary qualitative | Web (Brave / Exa / Serper / Parallel), Perplexity Sonar |
-| Tertiary qualitative | Hacker News, Reddit, GitHub |
+| Primary qualitative (~75% of weight) | **X / Twitter** (cookies → XAI fallback) |
+| Secondary qualitative | Web (Brave / Exa / Serper / Parallel) |
+| Tertiary (dev-activity for code-heavy topics) | GitHub |
 | Crypto data (enrichment) | **CoinGecko** (price, MC, FDV, exchanges), **Messari** (futures OI / funding / volume / volatility / sector), **LunarCrush** (Galaxy Score, AltRank, sentiment, top influencers, AI bull/bear themes) |
 | Tools | **Firecrawl** (URL scrape) |
+
+Removed from this fork (vs. the vanilla skill): YouTube, TikTok, Instagram, Bluesky, Threads, Truth Social, Polymarket, Xiaohongshu, Pinterest, Reddit, Hacker News, Perplexity Sonar.
 
 ## Env vars
 
@@ -50,7 +52,7 @@ Loaded from `~/.config/last30days-crypto/.env` (separate from the vanilla `/last
 - **Required for X**: `AUTH_TOKEN` + `CT0` (browser cookies) or `XAI_API_KEY`.
 - **Highly recommended (free tier)**: `COINGECKO_API_KEY`, `MESSARI_API_KEY` (legacy `MESSARI_SDK_API_KEY` also accepted), `LUNARCRUSH_API_KEY`, `FIRECRAWL_API_KEY`.
 - **Web search (recommended)**: `BRAVE_API_KEY` / `EXA_API_KEY` / `SERPER_API_KEY` / `PARALLEL_API_KEY`.
-- **Optional**: `OPENROUTER_API_KEY` (Perplexity Sonar), `GITHUB_TOKEN`.
+- **Optional**: `GITHUB_TOKEN` (richer GitHub search).
 
 ## How it works
 

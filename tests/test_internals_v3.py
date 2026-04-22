@@ -145,17 +145,13 @@ class TestFormatDate(unittest.TestCase):
 
 class TestFormatActor(unittest.TestCase):
 
-    def test_reddit_subreddit(self):
-        item = _item(source="reddit", container="python")
-        self.assertEqual(render._format_actor(item), "r/python")
-
     def test_x_handle(self):
         item = _item(source="x", author="karpathy")
         self.assertEqual(render._format_actor(item), "@karpathy")
 
-    def test_youtube_channel(self):
-        item = _item(source="youtube", author="Fireship")
-        self.assertEqual(render._format_actor(item), "Fireship")
+    def test_lunarcrush_handle(self):
+        item = _item(source="lunarcrush", author="cryptohayes")
+        self.assertEqual(render._format_actor(item), "@cryptohayes")
 
 
 # ---------------------------------------------------------------------------
@@ -164,11 +160,11 @@ class TestFormatActor(unittest.TestCase):
 
 class TestFormatEngagement(unittest.TestCase):
 
-    def test_reddit_format(self):
-        item = _item(engagement={"score": 344, "num_comments": 119})
+    def test_x_format(self):
+        item = _item(source="x", engagement={"likes": 200, "reposts": 35, "replies": 18, "quotes": 4})
         result = render._format_engagement(item)
-        self.assertIn("344", result)
-        self.assertIn("pts", result)
+        self.assertIn("200", result)
+        self.assertIn("likes", result)
 
     def test_empty_engagement(self):
         item = _item(engagement={})
@@ -295,28 +291,28 @@ class TestTrimSubqueriesForDepth(unittest.TestCase):
     def _sq(self, label: str = "primary", sources: list[str] = None) -> schema.SubQuery:
         return schema.SubQuery(
             label=label, search_query="test", ranking_query="test?",
-            sources=sources or ["reddit", "x", "grounding", "hackernews", "github", "perplexity"],
+            sources=sources or ["x", "grounding", "github", "coingecko", "messari", "lunarcrush"],
             weight=1.0,
         )
 
     def test_quick_limits_sources(self):
         sqs = [self._sq()]
-        result = planner._trim_subqueries_for_depth(sqs, "comparison", "quick", ["reddit", "x", "grounding"])
+        result = planner._trim_subqueries_for_depth(sqs, "comparison", "quick", ["x", "grounding", "github"])
         self.assertLessEqual(len(result[0].sources), 2)
 
     def test_default_comparison_expands_via_capabilities(self):
-        available = ["reddit", "x", "grounding", "hackernews", "github", "perplexity"]
+        available = ["x", "grounding", "github", "coingecko", "messari", "lunarcrush"]
         sqs = [self._sq(sources=available)]
         result = planner._trim_subqueries_for_depth(sqs, "comparison", "default", available)
-        # Comparison should use all capability-matched sources, not top-3
-        self.assertGreater(len(result[0].sources), 3)
+        # Comparison should use all capability-matched sources (kept set is now smaller)
+        self.assertGreaterEqual(len(result[0].sources), 3)
 
     def test_deep_expands_via_capabilities(self):
-        available = ["reddit", "x", "grounding", "hackernews", "github"]
+        available = ["x", "grounding", "github", "coingecko", "messari", "lunarcrush"]
         sqs = [self._sq(sources=available)]
         result = planner._trim_subqueries_for_depth(sqs, "comparison", "deep", available)
         # Deep comparison should also use capability expansion, not trim
-        self.assertGreaterEqual(len(result[0].sources), 4)
+        self.assertGreaterEqual(len(result[0].sources), 3)
 
 
 # ---------------------------------------------------------------------------

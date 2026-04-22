@@ -857,8 +857,9 @@ class TestRetryThinSourcesCoreEqualsTopic(unittest.TestCase):
 class TestZeroKeyPipelineRun(unittest.TestCase):
     """Pipeline should complete with local fallbacks when no reasoning keys are configured."""
 
+    @patch("lib.pipeline.available_sources", return_value=["x"])
     @patch("lib.pipeline._retrieve_stream")
-    def test_zero_key_run_produces_report(self, mock_retrieve):
+    def test_zero_key_run_produces_report(self, mock_retrieve, _mock_available):
         mock_retrieve.side_effect = lambda **kwargs: pipeline._mock_stream_results(
             kwargs["source"], kwargs["subquery"]
         )
@@ -867,7 +868,7 @@ class TestZeroKeyPipelineRun(unittest.TestCase):
             topic="test zero key topic",
             config=config,
             depth="quick",
-            requested_sources=["hackernews"],
+            requested_sources=["x"],
         )
         self.assertEqual("test zero key topic", report.topic)
         self.assertEqual("local", report.provider_runtime.reasoning_provider)

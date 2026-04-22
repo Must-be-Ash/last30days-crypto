@@ -369,24 +369,6 @@ def config_exists() -> bool:
     return False
 
 
-def is_reddit_available(config: dict[str, Any]) -> bool:
-    """Check if Reddit search is available.
-
-    v3 uses ScrapeCreators only.
-    """
-    return bool(config.get('SCRAPECREATORS_API_KEY'))
-
-
-def get_reddit_source(config: dict[str, Any]) -> str | None:
-    """Determine which Reddit backend to use.
-
-    Returns: 'scrapecreators' or None
-    """
-    if config.get('SCRAPECREATORS_API_KEY'):
-        return 'scrapecreators'
-    return None
-
-
 def get_x_source(config: dict[str, Any]) -> str | None:
     """Determine the best available explicit X/Twitter source.
 
@@ -425,12 +407,6 @@ def get_x_source(config: dict[str, Any]) -> str | None:
     return None
 
 
-def is_hackernews_available() -> bool:
-    """Check if Hacker News source is available.
-
-    Always returns True - HN uses free Algolia API, no key needed.
-    """
-    return True
 
 
 # ---------------------------------------------------------------------------

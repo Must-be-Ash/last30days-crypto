@@ -37,13 +37,13 @@ class UiV3Tests(unittest.TestCase):
         self.assertIn("LunarCrush", output)
         self.assertIn("~/.config/last30days-crypto/.env", output)
 
-    def test_build_nux_message_mentions_v3_unlock_paths(self):
+    def test_build_nux_message_mentions_kept_source_status(self):
         text = ui._build_nux_message(
-            {"available_sources": ["reddit", "youtube", "grounding"]}
+            {"available_sources": ["x", "grounding"]}
         )
-        self.assertIn("Reddit ✓, X ✗, YouTube ✓, Web ✓", text)
-        self.assertIn("works fine as-is", text)
-        self.assertIn("all free", text)
+        self.assertIn("X ✓", text)
+        self.assertIn("Web ✓", text)
+        self.assertIn("CoinGecko ✗", text)
 
     def test_show_complete_uses_actual_sources_for_source_restricted_runs(self):
         with mock.patch.object(ui, "IS_TTY", False):
@@ -56,26 +56,25 @@ class UiV3Tests(unittest.TestCase):
                 )
         output = stderr.getvalue()
         self.assertIn("Web: 2 results", output)
-        self.assertNotIn("Reddit:", output)
         self.assertNotIn("X:", output)
 
-    def test_show_complete_supports_newer_sources(self):
+    def test_show_complete_supports_crypto_sources(self):
         with mock.patch.object(ui, "IS_TTY", False):
             stderr = io.StringIO()
             with redirect_stderr(stderr):
                 progress = ui.ProgressDisplay("test topic", show_banner=False)
                 progress.show_complete(
                     source_counts={
-                        "bluesky": 3,
-                        "truthsocial": 1,
-                        "xiaohongshu": 4,
+                        "x": 3,
+                        "coingecko": 1,
+                        "lunarcrush": 2,
                     },
-                    display_sources=["bluesky", "truthsocial", "xiaohongshu"],
+                    display_sources=["x", "coingecko", "lunarcrush"],
                 )
         output = stderr.getvalue()
-        self.assertIn("Bluesky: 3 posts", output)
-        self.assertIn("Truth Social: 1 post", output)
-        self.assertIn("Xiaohongshu: 4 posts", output)
+        self.assertIn("X: 3 posts", output)
+        self.assertIn("CoinGecko: 1 bundle", output)
+        self.assertIn("LunarCrush: 2 bundles", output)
 
 
 if __name__ == "__main__":

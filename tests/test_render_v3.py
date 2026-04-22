@@ -20,25 +20,24 @@ def sample_report() -> schema.Report:
         snippet="A grounded snippet about the topic.",
         metadata={},
     )
-    reddit_item = schema.SourceItem(
+    x_item = schema.SourceItem(
         item_id="i2",
-        source="reddit",
+        source="x",
         title="Grounded result",
-        body="Reddit discussion body.",
-        url="https://example.com",
-        container="LocalLLaMA",
+        body="Crypto Twitter discussion body.",
+        url="https://x.com/cryptohayes/status/123",
+        author="cryptohayes",
         published_at="2026-03-14",
         date_confidence="high",
-        engagement={"score": 344, "num_comments": 119, "upvote_ratio": 0.92},
+        engagement={"likes": 344, "reposts": 119, "replies": 22, "quotes": 4},
         metadata={
             "top_comments": [{"excerpt": "This is the strongest user reaction.", "score": 22}],
-            "comment_insights": ["Users corroborate the main claim."],
         },
     )
     candidate = schema.Candidate(
         candidate_id="c1",
         item_id="i2",
-        source="reddit",
+        source="x",
         title="Grounded result",
         url="https://example.com",
         snippet="A grounded snippet about the topic.",
@@ -52,8 +51,8 @@ def sample_report() -> schema.Report:
         rerank_score=92,
         final_score=90,
         explanation="high-signal result",
-        sources=["reddit", "grounding"],
-        source_items=[reddit_item, primary_item],
+        sources=["x", "grounding"],
+        source_items=[x_item, primary_item],
     )
     cluster = schema.Cluster(
         cluster_id="cluster-1",
@@ -83,7 +82,7 @@ def sample_report() -> schema.Report:
         ),
         clusters=[cluster],
         ranked_candidates=[candidate],
-        items_by_source={"grounding": [primary_item], "reddit": [reddit_item]},
+        items_by_source={"grounding": [primary_item], "x": [x_item]},
         errors_by_source={},
     )
 
@@ -96,14 +95,9 @@ class RenderV3Tests(unittest.TestCase):
         self.assertIn("## Ranked Evidence Clusters", text)
         self.assertIn("## Stats", text)
         self.assertIn("Total evidence: 2 items across 2 sources", text)
-        self.assertIn("Top voices: example.com, r/LocalLLaMA", text)
-        self.assertIn("Web: 1 item | domains: example.com", text)
-        self.assertIn("Reddit: 1 item | 344pts, 119cmt | communities: r/LocalLLaMA", text)
-        self.assertIn("[reddit, grounding] Grounded result", text)
-        self.assertIn("[344pts, 119cmt]", text)
+        self.assertIn("@cryptohayes", text)
+        self.assertIn("[x, grounding] Grounded result", text)
         self.assertIn("Also on: Web", text)
-        self.assertIn("Comment (22 upvotes): This is the strongest user reaction.", text)
-        self.assertIn("Insight: Users corroborate the main claim.", text)
         self.assertIn("## Source Coverage", text)
 
     def test_render_context_includes_top_clusters(self):
@@ -124,7 +118,7 @@ class RenderV3Tests(unittest.TestCase):
 class RenderTopCommentsTests(unittest.TestCase):
     """Tests for the top-3 comments rendering in compact cluster view."""
 
-    def _make_report_with_comments(self, source="reddit", top_comments=None, comment_insights=None):
+    def _make_report_with_comments(self, source="x", top_comments=None, comment_insights=None):
         """Helper: build a report with a single candidate carrying given comments."""
         item = schema.SourceItem(
             item_id="i1",
@@ -149,7 +143,7 @@ class RenderTopCommentsTests(unittest.TestCase):
             url="https://reddit.com/r/test/comments/abc/test/",
             snippet="A test snippet.",
             subquery_labels=["primary"],
-            native_ranks={"primary:reddit": 1},
+            native_ranks={"primary:x": 1},
             local_relevance=0.9,
             freshness=90,
             engagement=88,
@@ -250,7 +244,7 @@ class RenderBestTakesCompactTests(unittest.TestCase):
         """Helper: build a candidate with a given fun_score."""
         item = schema.SourceItem(
             item_id=f"item-{cid}",
-            source="reddit",
+            source="x",
             title=f"Post {cid}",
             body="Body text.",
             url=f"https://reddit.com/r/test/comments/{cid}/",
@@ -265,12 +259,12 @@ class RenderBestTakesCompactTests(unittest.TestCase):
         return schema.Candidate(
             candidate_id=cid,
             item_id=f"item-{cid}",
-            source="reddit",
+            source="x",
             title=f"Post {cid}",
             url=f"https://reddit.com/r/test/comments/{cid}/",
             snippet="A test snippet.",
             subquery_labels=["primary"],
-            native_ranks={"primary:reddit": 1},
+            native_ranks={"primary:x": 1},
             local_relevance=0.9,
             freshness=90,
             engagement=88,
@@ -278,7 +272,7 @@ class RenderBestTakesCompactTests(unittest.TestCase):
             rrf_score=0.02,
             rerank_score=92,
             final_score=final_score,
-            sources=["reddit"],
+            sources=["x"],
             source_items=[item],
             fun_score=fun_score,
             fun_explanation=fun_explanation,
@@ -294,7 +288,7 @@ class RenderBestTakesCompactTests(unittest.TestCase):
             title="Test cluster",
             candidate_ids=[c.candidate_id for c in candidates],
             representative_ids=[c.candidate_id for c in candidates],
-            sources=["reddit"],
+            sources=["x"],
             score=90,
         )
         return schema.Report(
@@ -312,12 +306,12 @@ class RenderBestTakesCompactTests(unittest.TestCase):
                 freshness_mode="strict_recent",
                 cluster_mode="story",
                 raw_topic="test topic",
-                subqueries=[schema.SubQuery(label="primary", search_query="test", ranking_query="test?", sources=["reddit"])],
-                source_weights={"reddit": 1.0},
+                subqueries=[schema.SubQuery(label="primary", search_query="test", ranking_query="test?", sources=["x"])],
+                source_weights={"x": 1.0},
             ),
             clusters=[cluster],
             ranked_candidates=candidates,
-            items_by_source={"reddit": items},
+            items_by_source={"x": items},
             errors_by_source={},
         )
 

@@ -1,6 +1,6 @@
-"""Auto-resolve subreddits, X handles, and current events context for a topic.
+"""Auto-resolve X handles, GitHub repos, and current events context for a topic.
 
-Uses web search (Brave/Exa/Serper) to discover relevant communities and context
+Uses web search (Brave/Exa/Serper) to discover relevant accounts and context
 before the planner runs. This is the engine-side equivalent of SKILL.md Steps
 0.55/0.75 which use Claude Code's WebSearch tool.
 """
@@ -28,21 +28,6 @@ def _has_backend(config: dict) -> bool:
         or config.get("PARALLEL_API_KEY")
         or config.get("OPENROUTER_API_KEY")
     )
-
-
-def _extract_subreddits(items: list[dict]) -> list[str]:
-    """Parse subreddit names from search result titles and snippets."""
-    pattern = re.compile(r"r/([A-Za-z0-9_]{2,21})")
-    seen: set[str] = set()
-    results: list[str] = []
-    for item in items:
-        text = f"{item.get('title', '')} {item.get('snippet', '')} {item.get('url', '')}"
-        for match in pattern.findall(text):
-            lower = match.lower()
-            if lower not in seen:
-                seen.add(lower)
-                results.append(match)
-    return results
 
 
 def _extract_x_handle(items: list[dict]) -> str:
@@ -81,7 +66,6 @@ def _extract_github_user(items: list[dict]) -> str:
         for match in url_pattern.findall(text):
             lower = match.lower()
             counts[lower] = counts.get(lower, 0) + 1
-    # Filter out org/repo-like names and generic pages
     skip = {"topics", "explore", "settings", "orgs", "search", "features", "about", "pricing", "enterprise"}
     counts = {k: v for k, v in counts.items() if k not in skip}
     if not counts:
@@ -107,7 +91,7 @@ def _extract_github_repos(items: list[dict]) -> list[str]:
                 if lower not in seen:
                     seen.add(lower)
                     repos.append(match)
-    return repos[:5]  # cap at 5 repos
+    return repos[:5]
 
 
 def _build_context_summary(items: list[dict]) -> str:
@@ -119,7 +103,6 @@ def _build_context_summary(items: list[dict]) -> str:
             snippets.append(snippet)
     if not snippets:
         return ""
-    # Take the first two meaningful snippets and truncate to keep it concise
     combined = " ".join(snippets[:2])
     if len(combined) > 300:
         combined = combined[:297] + "..."
@@ -127,17 +110,13 @@ def _build_context_summary(items: list[dict]) -> str:
 
 
 def auto_resolve(topic: str, config: dict) -> dict:
-    """Discover subreddits, X handles, and current events context for a topic.
-
-    Args:
-        topic: The research topic.
-        config: Dict with API keys (BRAVE_API_KEY, EXA_API_KEY, SERPER_API_KEY).
+    """Discover X handles, GitHub repos, and current events context for a topic.
 
     Returns:
-        Dict with keys: subreddits, x_handle, context, searches_run.
+        Dict with keys: x_handle, github_user, github_repos, context, searches_run.
         Returns empty result if no web search backend is available.
     """
-    empty = {"subreddits": [], "x_handle": "", "context": "", "searches_run": 0}
+    empty = {"x_handle": "", "github_user": "", "github_repos": [], "context": "", "searches_run": 0}
 
     if not _has_backend(config):
         _log("No web search backend available, skipping resolve")
@@ -150,7 +129,6 @@ def auto_resolve(topic: str, config: dict) -> dict:
     current_year = now.strftime("%Y")
 
     queries = {
-        "subreddit": f"{topic} subreddit reddit",
         "news": f"{topic} news {current_month} {current_year}",
         "x_handle": f"{topic} X twitter handle",
         "github": f"{topic} github profile site:github.com",
@@ -178,16 +156,14 @@ def auto_resolve(topic: str, config: dict) -> dict:
                 _log(f"Search failed for {label}: {exc}")
                 results[label] = []
 
-    subreddits = _extract_subreddits(results.get("subreddit", []))
     x_handle = _extract_x_handle(results.get("x_handle", []))
     github_user = _extract_github_user(results.get("github", []))
     github_repos = _extract_github_repos(results.get("github", []))
     context = _build_context_summary(results.get("news", []))
 
-    _log(f"Resolved {len(subreddits)} subreddits, x_handle={x_handle!r}, github_user={github_user!r}, github_repos={github_repos!r}, context_len={len(context)}")
+    _log(f"Resolved x_handle={x_handle!r}, github_user={github_user!r}, github_repos={github_repos!r}, context_len={len(context)}")
 
     return {
-        "subreddits": subreddits,
         "x_handle": x_handle,
         "github_user": github_user,
         "github_repos": github_repos,

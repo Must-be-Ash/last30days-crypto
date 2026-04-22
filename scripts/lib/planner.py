@@ -25,20 +25,21 @@ ALLOWED_INTENTS = {
     "crypto_qual",
 }
 ALLOWED_CLUSTER_MODES = {"none", "story", "workflow", "market", "debate"}
-# Crypto-tailored: X is the spine; web/perplexity is the secondary qualitative
-# layer; HN/GitHub/Reddit are tertiary. coingecko/messari/lunarcrush carry
-# market & social-quant data and are appended only when the planner detects
-# a token mention (Phase 4.3).
+# Crypto-tailored: X is overwhelmingly the spine; web grounding is the only
+# qualitative supporting source; GitHub picks up dev-activity context for
+# infra/L2/protocol topics. coingecko/messari/lunarcrush carry market &
+# social-quant data and are appended only when the planner detects a token
+# mention (Phase 4.3).
 _CRYPTO_DATA_SOURCES = ["coingecko", "messari", "lunarcrush"]
-_BASE_PRIORITY = ["x", "grounding", "perplexity", "hackernews", "reddit", "github"]
-_PREDICTION_PRIORITY = ["x", "grounding"] + _CRYPTO_DATA_SOURCES + ["perplexity", "reddit", "hackernews"]
+_BASE_PRIORITY = ["x", "grounding", "github"]
+_PREDICTION_PRIORITY = ["x"] + _CRYPTO_DATA_SOURCES + ["grounding", "github"]
 # Crypto_data: market/onchain/social-quant questions. Crypto APIs first,
 # then X for chatter context, then web for news/docs.
-_CRYPTO_DATA_PRIORITY = _CRYPTO_DATA_SOURCES + ["x", "grounding", "perplexity", "reddit"]
+_CRYPTO_DATA_PRIORITY = _CRYPTO_DATA_SOURCES + ["x", "grounding"]
 # Crypto_qual: narrative/sentiment/launch questions. X-first, LunarCrush
-# heavy for sentiment, then web/perplexity for grounded news, then Messari
-# for project profile, then Reddit.
-_CRYPTO_QUAL_PRIORITY = ["x", "lunarcrush", "grounding", "perplexity", "messari", "reddit"]
+# heavy for sentiment, then web for grounded news, then Messari for project
+# profile.
+_CRYPTO_QUAL_PRIORITY = ["x", "lunarcrush", "grounding", "messari"]
 
 QUICK_SOURCE_PRIORITY = {
     "factual": _BASE_PRIORITY,
@@ -83,12 +84,9 @@ SOURCE_LIMITS = {
 }
 INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {}
 SOURCE_CAPABILITIES = {
-    "reddit": {"discussion", "social"},
     "x": {"discussion", "social"},
-    "hackernews": {"discussion", "link"},
     "github": {"discussion", "link"},
     "grounding": {"web", "reference", "link"},
-    "perplexity": {"web", "reference", "analysis"},
     "coingecko": {"crypto_data", "market"},
     "messari": {"crypto_data", "market", "onchain"},
     "lunarcrush": {"crypto_data", "social"},
@@ -204,14 +202,14 @@ Crypto-specific source vocabulary:
 - ``coingecko``: market data — price, market cap, volume, ATH, exchange listings, community size.
 - ``messari``: on-chain & derivatives — open interest, funding rate, futures volume, volatility, project profile.
 - ``lunarcrush``: social-quant — Galaxy Score, AltRank, sentiment %, top influencers, AI bull/bear themes.
-- ``x``: primary qualitative source — what crypto Twitter is actually saying right now.
-- ``grounding`` / ``perplexity``: web search for news, blog posts, governance docs, whitepapers.
-- ``reddit``, ``hackernews``, ``github``: tertiary qualitative + dev-activity context.
+- ``x``: PRIMARY qualitative source — what crypto Twitter is actually saying right now. X is the canonical narrative source for this skill — every subquery should include it unless the topic is purely quant.
+- ``grounding``: web search (Serper/Exa/Brave/Parallel) for news, blog posts, governance docs, whitepapers — secondary supporting context only.
+- ``github``: dev-activity for infra/L2/protocol topics (commits, PRs, issues) — tertiary, only when relevant to code-heavy topics.
 
 Intent rules:
 - ``crypto_data`` for quantitative questions (price, holders, OI, funding, TVL, volume, on-chain metrics, Galaxy Score). Route heavily to coingecko/messari/lunarcrush.
 - ``crypto_qual`` for narrative/sentiment/launch/influencer questions (memecoin narratives, sentiment shifts, top accounts, airdrop hype, ecosystem launches). X-first, LunarCrush heavy.
-- Other intents (factual/comparison/breaking_news/etc.) when the topic is generic crypto research without a clear quant or narrative focus.
+- Other intents (factual/comparison/breaking_news/etc.) when the topic is generic crypto research without a clear quant or narrative focus. X still leads.
 
 General rules:
 - emit 1 to 4 subqueries
@@ -428,7 +426,7 @@ def _fallback_plan(
                 label="odds",
                 search_query=f"{base_search} odds forecast",
                 ranking_query=f"What are the current odds, forecasts, or market signals about {topic}?",
-                sources=[source for source in source_weights if source in {"messari", "lunarcrush", "coingecko", "grounding", "x", "reddit"}] or list(source_weights),
+                sources=[source for source in source_weights if source in {"messari", "lunarcrush", "coingecko", "grounding", "x"}] or list(source_weights),
                 weight=0.7,
             )
         )
@@ -438,7 +436,7 @@ def _fallback_plan(
                 label="reaction",
                 search_query=f"{base_search} reaction update",
                 ranking_query=f"What new reactions or follow-up reporting from the last 30 days matter for {topic}?",
-                sources=[source for source in source_weights if source in {"x", "reddit", "grounding", "hackernews"}] or list(source_weights),
+                sources=[source for source in source_weights if source in {"x", "grounding"}] or list(source_weights),
                 weight=0.7,
             )
         )
@@ -513,39 +511,53 @@ def _default_cluster_mode(intent: str) -> str:
 
 
 def _default_source_weights(intent: str, sources: list[str]) -> dict[str, float]:
-    # Crypto-tailored: X is the spine across most intents. Crypto-data /
-    # crypto-qual intents tilt heavily toward the data APIs.
-    base = {source: 1.0 for source in sources}
-    for source, bonus in {"x": 1.5, "grounding": 0.6}.items():
-        if source in base:
-            base[source] += bonus
-    if intent == "prediction":
-        for source, bonus in {"x": 0.8, "messari": 1.5, "lunarcrush": 1.5, "coingecko": 1.0}.items():
-            if source in base:
-                base[source] += bonus
-    elif intent == "breaking_news":
-        for source, bonus in {"x": 1.0, "reddit": 0.6, "hackernews": 0.4}.items():
-            if source in base:
-                base[source] += bonus
-    elif intent == "how_to":
-        for source, bonus in {"hackernews": 0.8, "github": 0.5}.items():
-            if source in base:
-                base[source] += bonus
-    elif intent == "factual":
-        for source, bonus in {"reddit": 0.4, "grounding": 0.4}.items():
-            if source in base:
-                base[source] += bonus
-    elif intent == "crypto_data":
+    # X-dominant weighting: across qualitative sources (X, grounding, github)
+    # X gets ~70-80% of the weight. Crypto enrichment APIs (coingecko, messari,
+    # lunarcrush) sit on a parallel axis when present and don't compete with
+    # qualitative ranking — they're rendered separately in the Market & On-chain
+    # section. Their weights here just affect which subqueries the planner
+    # prefers to issue.
+    base = {source: 0.5 for source in sources}
+    # Massive X baseline: in a 3-source qualitative mix (x + grounding + github)
+    # this puts X at ~75% of qualitative weight.
+    if "x" in base:
+        base["x"] += 4.0
+    if "grounding" in base:
+        base["grounding"] += 0.4
+    if "github" in base:
+        base["github"] += 0.2
+    # Per-intent tilts. X stays dominant in every intent except crypto_data,
+    # where the data APIs need to lead so the planner issues subqueries to them.
+    if intent == "crypto_data":
         # Quantitative crypto: data APIs lead, X provides chatter context.
-        for source, bonus in {"coingecko": 2.0, "messari": 2.0, "lunarcrush": 1.5, "grounding": 0.4}.items():
+        # Reduce X's lead so the data APIs become the primary signal.
+        if "x" in base:
+            base["x"] = 1.0
+        for source, bonus in {"coingecko": 2.5, "messari": 2.5, "lunarcrush": 2.0, "grounding": 0.3}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "crypto_qual":
-        # Narrative/sentiment: X-first, LunarCrush heavy for sentiment data,
-        # web second for grounded news, Messari lightly for project profile.
-        for source, bonus in {"x": 1.0, "lunarcrush": 1.8, "messari": 0.8, "grounding": 0.4}.items():
+        # Narrative/sentiment: X already dominates, LunarCrush adds sentiment depth.
+        for source, bonus in {"x": 0.5, "lunarcrush": 2.0, "messari": 0.5, "grounding": 0.2}.items():
             if source in base:
                 base[source] += bonus
+    elif intent == "prediction":
+        # Prediction wants X chatter + data APIs.
+        for source, bonus in {"messari": 1.5, "lunarcrush": 1.5, "coingecko": 1.0}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "breaking_news":
+        # X is already dominant; bump it further for breaking news.
+        if "x" in base:
+            base["x"] += 1.0
+    elif intent == "how_to":
+        # Code-heavy how-tos benefit from GitHub.
+        if "github" in base:
+            base["github"] += 1.0
+    elif intent == "factual":
+        # Factual lookups benefit from web grounding.
+        if "grounding" in base:
+            base["grounding"] += 0.5
     return base
 
 

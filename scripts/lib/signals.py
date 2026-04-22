@@ -9,16 +9,12 @@ from . import dates, relevance, schema
 # Editorial signal-to-noise scores. Grounding (Google Search) is 1.0 baseline;
 # social platforms discounted for noise.
 SOURCE_QUALITY = {
-    "xiaohongshu": 0.7,
-    "hackernews": 0.8,
-    "youtube": 0.85,
-    "reddit": 0.6,
-    "x": 0.68,
-    "bluesky": 0.66,
-    "truthsocial": 0.6,
-    "polymarket": 0.5,
-    "instagram": 0.58,
-    "tiktok": 0.58,
+    "x": 0.75,
+    "grounding": 1.0,
+    "github": 0.8,
+    "lunarcrush": 0.7,
+    "coingecko": 0.9,
+    "messari": 0.9,
 }
 
 
@@ -34,13 +30,6 @@ def local_relevance(item: schema.SourceItem, ranking_query: str) -> float:
     )
     hashtags = item.metadata.get("hashtags") if isinstance(item.metadata, dict) else None
     score = relevance.token_overlap_relevance(ranking_query, text, hashtags=hashtags)
-
-    # High-engagement YouTube floor: official videos with millions of views
-    # often have titles that don't keyword-match the query (e.g., "YE - FATHER
-    # (feat. TRAVIS SCOTT)" doesn't match "kanye west"). The engagement signals
-    # say "this is important" even when text overlap is weak.
-    if item.source == "youtube" and item.engagement.get("views", 0) > 100_000:
-        score = max(score, 0.3)
 
     # Project-mode GitHub floor: items fetched via --github-repo are explicitly
     # requested by the user and relevant by construction. Without this floor,
@@ -86,13 +75,8 @@ def _top_comment_score(item: schema.SourceItem) -> float:
 # are not simple log1p fields.
 ENGAGEMENT_WEIGHTS: dict[str, list[tuple[str, float]]] = {
     "x":            [("likes", 0.55), ("reposts", 0.25), ("replies", 0.15), ("quotes", 0.05)],
-    "youtube":      [("views", 0.50), ("likes", 0.35), ("comments", 0.15)],
-    "tiktok":       [("views", 0.50), ("likes", 0.30), ("comments", 0.20)],
-    "instagram":    [("views", 0.50), ("likes", 0.30), ("comments", 0.20)],
-    "hackernews":   [("points", 0.55), ("comments", 0.45)],
-    "bluesky":      [("likes", 0.40), ("reposts", 0.30), ("replies", 0.20), ("quotes", 0.10)],
-    "truthsocial":  [("likes", 0.45), ("reposts", 0.30), ("replies", 0.25)],
-    "polymarket":   [("volume", 0.60), ("liquidity", 0.40)],
+    "github":       [("reactions", 0.60), ("comments", 0.40)],
+    "lunarcrush":   [("interactions_24h", 0.70), ("creator_followers", 0.30)],
 }
 
 
@@ -101,16 +85,6 @@ def _weighted_engagement(item: schema.SourceItem, weights: list[tuple[str, float
     if not any(v for v, _ in values):
         return None
     return sum(v * w for v, w in values)
-
-
-def _reddit_engagement(item: schema.SourceItem) -> float | None:
-    score = log1p_safe(item.engagement.get("score"))
-    comments = log1p_safe(item.engagement.get("num_comments"))
-    ratio = float(item.engagement.get("upvote_ratio") or 0.0)
-    top_comment = _top_comment_score(item)
-    if not any([score, comments, ratio, top_comment]):
-        return None
-    return (0.50 * score) + (0.35 * comments) + (0.05 * (ratio * 10.0)) + (0.10 * top_comment)
 
 
 def _generic_engagement(item: schema.SourceItem) -> float | None:
@@ -123,8 +97,6 @@ def _generic_engagement(item: schema.SourceItem) -> float | None:
 
 
 def engagement_raw(item: schema.SourceItem) -> float | None:
-    if item.source == "reddit":
-        return _reddit_engagement(item)
     weights = ENGAGEMENT_WEIGHTS.get(item.source)
     if weights:
         return _weighted_engagement(item, weights)
@@ -167,28 +139,16 @@ def annotate_stream(
     return sorted(items, key=lambda item: item.local_rank_score or 0, reverse=True)
 
 
-_SOCIAL_SOURCES = {"reddit", "x", "tiktok", "instagram", "bluesky", "truthsocial"}
-
-# Minimum view count for short-video platforms. Items below this floor
-# are typically spam reposts or low-effort clips that add no unique signal.
-_VIDEO_ENGAGEMENT_FLOOR_SOURCES = {"tiktok", "instagram"}
-_VIDEO_ENGAGEMENT_FLOOR_VIEWS = 1000
+_SOCIAL_SOURCES = {"x", "lunarcrush"}
 
 
 def _passes_engagement_floor(item: schema.SourceItem, sole_source: bool) -> bool:
-    """Check whether a TikTok/Instagram item meets the minimum view floor.
+    """No engagement floor in the crypto pipeline — all sources always pass.
 
-    Items from sources not in _VIDEO_ENGAGEMENT_FLOOR_SOURCES always pass.
-    If the item's source is the *only* source represented in the batch
-    (sole_source=True), all items pass so we never return an empty result
-    for a whole source.
+    Kept as a no-op so callers in prune_low_relevance don't need to change.
+    Original: short-form video sources (TikTok/Instagram) had a min-view floor.
     """
-    if item.source not in _VIDEO_ENGAGEMENT_FLOOR_SOURCES:
-        return True
-    if sole_source:
-        return True
-    views = item.engagement.get("views", 0) if item.engagement else 0
-    return views >= _VIDEO_ENGAGEMENT_FLOOR_VIEWS
+    return True
 
 
 def prune_low_relevance(

@@ -67,8 +67,8 @@ class CliV3Tests(unittest.TestCase):
 
     def test_parse_search_flag_normalizes_aliases_and_dedupes(self):
         self.assertEqual(
-            ["grounding", "reddit", "hackernews"],
-            cli.parse_search_flag("web, reddit, hn, web"),
+            ["grounding", "x", "github"],
+            cli.parse_search_flag("web, x, github, web"),
         )
 
     def test_parse_search_flag_rejects_invalid_or_empty_inputs(self):
@@ -91,17 +91,17 @@ class CliV3Tests(unittest.TestCase):
     def test_ensure_supported_python_allows_supported_interpreter(self):
         cli.ensure_supported_python((3, 12, 0))
 
-    def test_missing_sources_for_promo_prefers_reddit_x_then_web(self):
+    def test_missing_sources_for_promo_prefers_x_then_web(self):
         self.assertEqual(
             "both",
-            cli._missing_sources_for_promo({"available_sources": ["youtube"]}),
+            cli._missing_sources_for_promo({"available_sources": ["github"]}),
         )
         self.assertEqual(
             "web",
-            cli._missing_sources_for_promo({"available_sources": ["reddit", "x"]}),
+            cli._missing_sources_for_promo({"available_sources": ["x"]}),
         )
         self.assertIsNone(
-            cli._missing_sources_for_promo({"available_sources": ["reddit", "x", "grounding"]}),
+            cli._missing_sources_for_promo({"available_sources": ["x", "grounding"]}),
         )
 
     def test_slugify_and_emit_output_cover_supported_modes(self):
@@ -168,7 +168,7 @@ class CliV3Tests(unittest.TestCase):
     def test_main_wires_banner_and_progress_display(self):
         report = self.make_report()
         diag = {
-            "available_sources": ["grounding", "youtube"],
+            "available_sources": ["github"],
             "providers": {"google": True, "openai": False, "xai": False},
             "x_backend": None,
             "bird_installed": True,
@@ -197,6 +197,7 @@ class CliV3Tests(unittest.TestCase):
             source_counts={"grounding": 0},
             display_sources=["grounding"],
         )
+        # Both x and web are missing from this diag (only github) → promo returns "both"
         fake_progress.show_promo.assert_called_once_with("both", diag=diag)
         self.assertIn("# rendered", stdout.getvalue())
 
