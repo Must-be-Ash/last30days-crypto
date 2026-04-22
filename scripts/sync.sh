@@ -7,9 +7,8 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 echo "Source: $SRC"
 
 COMMON_TARGETS=(
-  # Claude Code plugin cache: marketplace installs overwrite on update,
-  # but local development needs the cache kept in sync with the repo.
-  "$HOME/.claude/plugins/cache/last30days-crypto-private/last30days-crypto/3.0.0-alpha"
+  # Claude Code plugin cache: keeps local dev in sync with repo.
+  "$HOME/.claude/plugins/cache/last30days-crypto/last30days-crypto/3.0.0"
   "$HOME/.agents/skills/last30days-crypto"
   "$HOME/.codex/skills/last30days-crypto"
 )
@@ -73,6 +72,16 @@ if [ -d "$SRC/variants/open" ]; then
 else
   echo ""
   echo "Skipping OpenClaw target (no variants/open in this repo)"
+fi
+
+# Ensure ~/.claude/skills/last30days-crypto symlink exists (Claude Code slash-command registration)
+CLAUDE_SKILLS_LINK="$HOME/.claude/skills/last30days-crypto"
+AGENTS_SKILL="$HOME/.agents/skills/last30days-crypto"
+if [ ! -e "$CLAUDE_SKILLS_LINK" ]; then
+  ln -s "$AGENTS_SKILL" "$CLAUDE_SKILLS_LINK"
+  echo "Created symlink: $CLAUDE_SKILLS_LINK -> $AGENTS_SKILL"
+elif [ -L "$CLAUDE_SKILLS_LINK" ]; then
+  echo "Symlink already exists: $CLAUDE_SKILLS_LINK"
 fi
 
 echo ""
