@@ -10,6 +10,5 @@
   "repository": "https://github.com/Must-be-Ash/last30days-crypto",
   "license": "MIT",
   "keywords": ["crypto", "defi", "tokens", "research", "twitter", "x", "coingecko", "messari", "lunarcrush", "firecrawl", "web-search", "multi-source", "news", "citations"],
-  "skills": ["./"],
   "hooks": {}
 }
