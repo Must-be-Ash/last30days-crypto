@@ -369,6 +369,11 @@ def config_exists() -> bool:
     return False
 
 
+def is_reddit_available(config: dict[str, Any]) -> bool:
+    """Reddit public JSON works without any API key — always available."""
+    return True
+
+
 def get_x_source(config: dict[str, Any]) -> str | None:
     """Determine the best available explicit X/Twitter source.
 

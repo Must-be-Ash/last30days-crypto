@@ -15,6 +15,7 @@ SOURCE_LABELS = {
     "coingecko": "CoinGecko (market data)",
     "messari": "Messari (on-chain & derivatives)",
     "lunarcrush": "LunarCrush (social-quant)",
+    "reddit": "Reddit",
     "github": "GitHub",
 }
 

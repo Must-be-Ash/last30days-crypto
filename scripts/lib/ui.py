@@ -63,6 +63,7 @@ WEB_ONLY_MESSAGES = [
 SOURCE_COMPLETION_ORDER = [
     "x",
     "grounding",
+    "reddit",
     "github",
     "coingecko",
     "messari",
@@ -72,6 +73,7 @@ SOURCE_COMPLETION_ORDER = [
 SOURCE_COMPLETION_META = {
     "x": ("X", "post", "posts", Colors.CYAN),
     "grounding": ("Web", "result", "results", Colors.GREEN),
+    "reddit": ("Reddit", "thread", "threads", Colors.YELLOW),
     "github": ("GitHub", "result", "results", Colors.PURPLE),
     "coingecko": ("CoinGecko", "bundle", "bundles", Colors.GREEN),
     "messari": ("Messari", "bundle", "bundles", Colors.GREEN),
@@ -110,12 +112,13 @@ def _build_nux_message(diag: dict = None) -> str:
     if diag:
         x = "✓" if "x" in available else "✗"
         web = "✓" if "grounding" in available else "✗"
+        reddit = "✓" if "reddit" in available else "✗"
         cg = "✓" if "coingecko" in available else "✗"
         msr = "✓" if "messari" in available else "✗"
         lc = "✓" if "lunarcrush" in available else "✗"
-        status_line = f"X {x}, Web {web}, CoinGecko {cg}, Messari {msr}, LunarCrush {lc}"
+        status_line = f"X {x}, Web {web}, Reddit {reddit}, CoinGecko {cg}, Messari {msr}, LunarCrush {lc}"
     else:
-        status_line = "X ✗, Web ✓, CoinGecko ✗, Messari ✗, LunarCrush ✗"
+        status_line = "X ✗, Web ✓, Reddit ✓, CoinGecko ✗, Messari ✗, LunarCrush ✗"
 
     return f"""
 I just researched that for you. Here's what I've got right now:
@@ -354,6 +357,7 @@ def show_diagnostic_banner(diag: dict):
     available_sources = set(diag.get("available_sources") or [])
     has_x = "x" in available_sources
     has_web = "grounding" in available_sources
+    has_reddit = "reddit" in available_sources
     has_github = "github" in available_sources
     has_cg = "coingecko" in available_sources
     has_msr = "messari" in available_sources
@@ -395,6 +399,9 @@ def show_diagnostic_banner(diag: dict):
         lines.append(_row(Colors.GREEN, "✅", "Web", f"{backend} API"))
     else:
         lines.append(_row(Colors.YELLOW, "⚡", "Web", "Add SERPER_API_KEY or EXA_API_KEY"))
+
+    # Reddit (tertiary, free public JSON, always available)
+    lines.append(_row(Colors.GREEN if has_reddit else Colors.RED, "✅" if has_reddit else "❌", "Reddit", "public JSON" if has_reddit else "unavailable"))
 
     # GitHub (tertiary, dev-activity context for code-heavy topics)
     lines.append(_row(Colors.GREEN if has_github else Colors.YELLOW, "✅" if has_github else "⚡", "GitHub", "API" if has_github else "Add GITHUB_TOKEN"))

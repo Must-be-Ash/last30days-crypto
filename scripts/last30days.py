@@ -166,6 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Web search backend (default: auto, tries Brave then Exa then Serper then Parallel)")
     parser.add_argument("--plan", help="JSON query plan (skips internal LLM planner). Can be a JSON string or a file path.")
     parser.add_argument("--save-suffix", help="Suffix for saved output filename (e.g., 'gemini' → kanye-west-raw-gemini.md)")
+    parser.add_argument("--subreddits", help="Comma-separated subreddit names to search (e.g., CryptoCurrency,ethfinance). r/ prefix optional.")
     parser.add_argument("--token", action="append", default=None,
                         help="Force-include a token symbol for crypto enrichment (repeatable, e.g. --token HYPE --token SOL).")
     parser.add_argument("--no-crypto", action="store_true",
@@ -174,7 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Firecrawl-scrape the given URL (repeatable). Counts against the per-run scrape budget.")
     parser.add_argument("--lookback-days", type=int, default=30, help="Number of days to look back for research (default: 30, watchlist uses 90)")
     parser.add_argument("--auto-resolve", action="store_true",
-                        help="Use web search to discover X handles + GitHub repos before planning (for platforms without WebSearch)")
+                        help="Use web search to discover subreddits + X handles + GitHub repos before planning (for platforms without WebSearch)")
     parser.add_argument("--github-user", help="GitHub username for person-mode search (e.g., steipete)")
     parser.add_argument("--github-repo", help="Comma-separated owner/repo for project-mode search (e.g., openclaw/openclaw,paperclipai/paperclip)")
     return parser
@@ -187,6 +188,8 @@ def _missing_sources_for_promo(diag: dict[str, object]) -> str | None:
         missing.append("x")
     if "grounding" not in available:
         missing.append("web")
+    if "reddit" not in available:
+        missing.append("reddit")
     if not missing:
         return None
     if len(missing) > 1:
@@ -274,6 +277,7 @@ def main() -> int:
     depth = "deep" if args.deep else "quick" if args.quick else "default"
     try:
         x_related = [h.strip() for h in args.x_related.split(",") if h.strip()] if args.x_related else None
+        subreddits = [s.strip().lstrip("r/") for s in args.subreddits.split(",") if s.strip()] if args.subreddits else None
         # Parse external plan if provided via --plan flag
         external_plan = None
         if args.plan:
@@ -286,12 +290,15 @@ def main() -> int:
             except _json.JSONDecodeError as exc:
                 sys.stderr.write(f"[Planner] Invalid --plan JSON: {exc}\n")
 
-        # Auto-resolve: use web search to discover X handles + GitHub repos before planning.
-        # This is the engine-side equivalent of SKILL.md Steps 0.55/0.75 for platforms
-        # without WebSearch (OpenClaw, Codex, raw CLI).
+        # Auto-resolve: use web search to discover subreddits + X handles + GitHub repos
+        # before planning. Engine-side equivalent of SKILL.md Steps 0.55/0.75 for
+        # platforms without WebSearch (OpenClaw, Codex, raw CLI).
         if args.auto_resolve and not external_plan:
             from lib import resolve
             resolution = resolve.auto_resolve(topic, config)
+            if resolution.get("subreddits") and not subreddits:
+                subreddits = resolution["subreddits"]
+                sys.stderr.write(f"[AutoResolve] Subreddits: {', '.join(subreddits)}\n")
             if resolution.get("x_handle") and not args.x_handle:
                 args.x_handle = resolution["x_handle"]
                 sys.stderr.write(f"[AutoResolve] X handle: @{args.x_handle}\n")
@@ -328,6 +335,7 @@ def main() -> int:
             x_related=x_related,
             web_backend=args.web_backend,
             external_plan=external_plan,
+            subreddits=subreddits,
             lookback_days=args.lookback_days,
             github_user=github_user,
             github_repos=github_repos,

@@ -26,6 +26,7 @@ from . import (
     planner,
     providers,
     query,
+    reddit_public,
     rerank,
     schema,
     signals,
@@ -56,6 +57,7 @@ CRYPTO_ENRICHMENT_SOURCES = {"coingecko", "messari", "lunarcrush"}
 MOCK_AVAILABLE_SOURCES = [
     "x",
     "grounding",
+    "reddit",
     "github",
     "coingecko",
     "messari",
@@ -81,6 +83,9 @@ def available_sources(config: dict[str, Any], requested_sources: list[str] | Non
         available.append("x")
     if config.get("BRAVE_API_KEY") or config.get("EXA_API_KEY") or config.get("SERPER_API_KEY") or config.get("PARALLEL_API_KEY"):
         available.append("grounding")
+    # Reddit public JSON works without any API key — always available as a
+    # tertiary qualitative source for crypto community discussion.
+    available.append("reddit")
     if config.get("GITHUB_TOKEN") or which("gh"):
         available.append("github")
     # Crypto data APIs - additive enrichment sources. Pipeline only invokes
@@ -140,6 +145,7 @@ def run(
     x_related: list[str] | None = None,
     web_backend: str = "auto",
     external_plan: dict | None = None,
+    subreddits: list[str] | None = None,
     lookback_days: int = 30,
     github_user: str | None = None,
     github_repos: list[str] | None = None,
@@ -325,6 +331,7 @@ def run(
                         rate_limit_lock=rate_limit_lock,
                         web_backend=web_backend,
                         raw_topic=topic,
+                        subreddits=subreddits,
                     )
                 ] = (subquery, source)
 
@@ -351,6 +358,7 @@ def run(
                             rate_limit_lock=rate_limit_lock,
                             web_backend=web_backend,
                             raw_topic=topic,
+                            subreddits=subreddits,
                         )
                     except Exception as retry_exc:
                         bundle.errors_by_source[source] = f"{exc} (retried once, still failed: {retry_exc})"
@@ -626,13 +634,25 @@ def _run_supplemental_searches(
         {"author_handle": item.author or "", "text": item.body or ""}
         for item in bundle.items_by_source.get("x", [])
     ]
+    reddit_dicts = [
+        {
+            "subreddit": item.container or "",
+            "comment_insights": item.metadata.get("comment_insights", []),
+            "top_comments": [
+                {"excerpt": c.get("excerpt", c.get("text", ""))}
+                for c in (item.metadata.get("top_comments") or [])
+                if isinstance(c, dict)
+            ],
+        }
+        for item in bundle.items_by_source.get("reddit", [])
+    ]
 
-    if not x_dicts and not x_handle and not x_related:
+    if not x_dicts and not reddit_dicts and not x_handle and not x_related:
         return
 
     entities = entity_extract.extract_entities(
-        [], x_dicts,
-        max_handles=3, max_subreddits=0,
+        reddit_dicts, x_dicts,
+        max_handles=3, max_subreddits=3,
     )
 
     handles = entities.get("x_handles", [])
@@ -852,6 +872,7 @@ def _retrieve_stream(
     rate_limit_lock: threading.Lock | None = None,
     web_backend: str = "auto",
     raw_topic: str = "",
+    subreddits: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
     # Early exit if source was rate-limited by a sibling future
     if rate_limited_sources is not None and source in rate_limited_sources:
@@ -862,6 +883,22 @@ def _retrieve_stream(
     if source == "grounding":
         return grounding.web_search(
             subquery.search_query, date_range, config, backend=web_backend)
+    if source == "reddit":
+        # Public JSON only — no API key required. Uses raw_topic so
+        # expand_reddit_queries() generates diverse variants from the
+        # original user topic, not the planner's narrowed search_query.
+        reddit_query = raw_topic or subquery.search_query
+        try:
+            results = reddit_public.search_reddit_public(
+                reddit_query, from_date, to_date, depth=depth,
+                subreddits=subreddits,
+            )
+            return results, {}
+        except Exception as exc:
+            sys.stderr.write(
+                f"[Reddit] Public search failed ({type(exc).__name__}: {exc})\n"
+            )
+            return [], {}
     if source == "x":
         backend = runtime.x_search_backend or env.get_x_source(config)
         if backend == "bird":
@@ -893,6 +930,20 @@ def _google_key(config: dict[str, Any]) -> str | None:
 
 def _mock_stream_results(source: str, subquery: schema.SubQuery) -> tuple[list[dict], dict]:
     payloads = {
+        "reddit": [
+            {
+                "id": "R1",
+                "title": f"{subquery.search_query} discussion thread",
+                "url": "https://reddit.com/r/CryptoCurrency/comments/1",
+                "subreddit": "CryptoCurrency",
+                "date": dates.get_date_range(5)[0],
+                "engagement": {"score": 120, "num_comments": 48, "upvote_ratio": 0.91},
+                "selftext": f"Community discussion about {subquery.search_query}.",
+                "top_comments": [{"excerpt": "Strong firsthand feedback from users."}],
+                "relevance": 0.82,
+                "why_relevant": "Mock Reddit result",
+            }
+        ],
         "x": [
             {
                 "id": "X1",

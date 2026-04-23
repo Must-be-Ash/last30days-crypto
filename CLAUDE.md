@@ -1,6 +1,6 @@
 # last30days-crypto Skill
 
-Claude Code skill (slash command `/last30days-crypto`) for crypto research. X is the dominant qualitative source (~75% of weight); CoinGecko, Messari, and LunarCrush provide market, on-chain, and social-quant data; web grounding + GitHub fill in. Reddit, Hacker News, and Perplexity were removed to keep the source set tight and X-focused. Repo: <https://github.com/Must-be-Ash/last30days-crypto>. **Fully separated from the vanilla `/last30days` skill (mvanhorn/last30days-skill)**: this skill reads from `~/.config/last30days-crypto/.env` and writes outputs to `~/Documents/Last30Days-Crypto/` so both can coexist with zero shared state.
+Claude Code skill (slash command `/last30days-crypto`) for crypto research. X is the dominant qualitative source (~70% of weight); CoinGecko, Messari, and LunarCrush provide market, on-chain, and social-quant data; web grounding + Reddit + GitHub fill in (Reddit via free public JSON for r/CryptoCurrency, r/ethfinance, r/solana, etc.). Hacker News and Perplexity were removed to keep the source set tight and X-focused. Repo: <https://github.com/Must-be-Ash/last30days-crypto>. **Fully separated from the vanilla `/last30days` skill (mvanhorn/last30days-skill)**: this skill reads from `~/.config/last30days-crypto/.env` and writes outputs to `~/Documents/Last30Days-Crypto/` so both can coexist with zero shared state.
 
 ## Structure
 - `scripts/last30days.py` — main research engine

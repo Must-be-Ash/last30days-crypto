@@ -1,8 +1,8 @@
-"""Auto-resolve X handles, GitHub repos, and current events context for a topic.
+"""Auto-resolve subreddits, X handles, GitHub repos, and current events context for a topic.
 
-Uses web search (Brave/Exa/Serper) to discover relevant accounts and context
-before the planner runs. This is the engine-side equivalent of SKILL.md Steps
-0.55/0.75 which use Claude Code's WebSearch tool.
+Uses web search (Brave/Exa/Serper) to discover relevant communities, accounts,
+and context before the planner runs. This is the engine-side equivalent of
+SKILL.md Steps 0.55/0.75 which use Claude Code's WebSearch tool.
 """
 
 from __future__ import annotations
@@ -28,6 +28,21 @@ def _has_backend(config: dict) -> bool:
         or config.get("PARALLEL_API_KEY")
         or config.get("OPENROUTER_API_KEY")
     )
+
+
+def _extract_subreddits(items: list[dict]) -> list[str]:
+    """Parse subreddit names from search result titles, snippets, and URLs."""
+    pattern = re.compile(r"r/([A-Za-z0-9_]{2,21})")
+    seen: set[str] = set()
+    results: list[str] = []
+    for item in items:
+        text = f"{item.get('title', '')} {item.get('snippet', '')} {item.get('url', '')}"
+        for match in pattern.findall(text):
+            lower = match.lower()
+            if lower not in seen:
+                seen.add(lower)
+                results.append(match)
+    return results
 
 
 def _extract_x_handle(items: list[dict]) -> str:
@@ -116,7 +131,7 @@ def auto_resolve(topic: str, config: dict) -> dict:
         Dict with keys: x_handle, github_user, github_repos, context, searches_run.
         Returns empty result if no web search backend is available.
     """
-    empty = {"x_handle": "", "github_user": "", "github_repos": [], "context": "", "searches_run": 0}
+    empty = {"subreddits": [], "x_handle": "", "github_user": "", "github_repos": [], "context": "", "searches_run": 0}
 
     if not _has_backend(config):
         _log("No web search backend available, skipping resolve")
@@ -129,6 +144,7 @@ def auto_resolve(topic: str, config: dict) -> dict:
     current_year = now.strftime("%Y")
 
     queries = {
+        "subreddit": f"{topic} subreddit reddit",
         "news": f"{topic} news {current_month} {current_year}",
         "x_handle": f"{topic} X twitter handle",
         "github": f"{topic} github profile site:github.com",
@@ -156,14 +172,16 @@ def auto_resolve(topic: str, config: dict) -> dict:
                 _log(f"Search failed for {label}: {exc}")
                 results[label] = []
 
+    subreddits = _extract_subreddits(results.get("subreddit", []))
     x_handle = _extract_x_handle(results.get("x_handle", []))
     github_user = _extract_github_user(results.get("github", []))
     github_repos = _extract_github_repos(results.get("github", []))
     context = _build_context_summary(results.get("news", []))
 
-    _log(f"Resolved x_handle={x_handle!r}, github_user={github_user!r}, github_repos={github_repos!r}, context_len={len(context)}")
+    _log(f"Resolved {len(subreddits)} subreddits, x_handle={x_handle!r}, github_user={github_user!r}, github_repos={github_repos!r}, context_len={len(context)}")
 
     return {
+        "subreddits": subreddits,
         "x_handle": x_handle,
         "github_user": github_user,
         "github_repos": github_repos,

@@ -37,13 +37,14 @@ CLI flags:
 
 | Tier | Sources |
 |------|---------|
-| Primary qualitative (~75% of weight) | **X / Twitter** (cookies → XAI fallback) |
+| Primary qualitative (~70% of weight) | **X / Twitter** (cookies → XAI fallback) |
 | Secondary qualitative | Web (Brave / Exa / Serper / Parallel) |
+| Tertiary qualitative | **Reddit** (public JSON, no key) — community discussion from r/CryptoCurrency, r/ethfinance, r/solana, etc. |
 | Tertiary (dev-activity for code-heavy topics) | GitHub |
 | Crypto data (enrichment) | **CoinGecko** (price, MC, FDV, exchanges), **Messari** (futures OI / funding / volume / volatility / sector), **LunarCrush** (Galaxy Score, AltRank, sentiment, top influencers, AI bull/bear themes) |
 | Tools | **Firecrawl** (URL scrape) |
 
-Removed from this fork (vs. the vanilla skill): YouTube, TikTok, Instagram, Bluesky, Threads, Truth Social, Polymarket, Xiaohongshu, Pinterest, Reddit, Hacker News, Perplexity Sonar.
+Removed from this fork (vs. the vanilla skill): YouTube, TikTok, Instagram, Bluesky, Threads, Truth Social, Polymarket, Xiaohongshu, Pinterest, Hacker News, Perplexity Sonar.
 
 ## Env vars
 

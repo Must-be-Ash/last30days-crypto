@@ -31,15 +31,15 @@ ALLOWED_CLUSTER_MODES = {"none", "story", "workflow", "market", "debate"}
 # social-quant data and are appended only when the planner detects a token
 # mention (Phase 4.3).
 _CRYPTO_DATA_SOURCES = ["coingecko", "messari", "lunarcrush"]
-_BASE_PRIORITY = ["x", "grounding", "github"]
-_PREDICTION_PRIORITY = ["x"] + _CRYPTO_DATA_SOURCES + ["grounding", "github"]
+_BASE_PRIORITY = ["x", "grounding", "reddit", "github"]
+_PREDICTION_PRIORITY = ["x"] + _CRYPTO_DATA_SOURCES + ["grounding", "reddit", "github"]
 # Crypto_data: market/onchain/social-quant questions. Crypto APIs first,
 # then X for chatter context, then web for news/docs.
 _CRYPTO_DATA_PRIORITY = _CRYPTO_DATA_SOURCES + ["x", "grounding"]
 # Crypto_qual: narrative/sentiment/launch questions. X-first, LunarCrush
-# heavy for sentiment, then web for grounded news, then Messari for project
-# profile.
-_CRYPTO_QUAL_PRIORITY = ["x", "lunarcrush", "grounding", "messari"]
+# heavy for sentiment, then web for grounded news, then Reddit community
+# discussion, then Messari for project profile.
+_CRYPTO_QUAL_PRIORITY = ["x", "lunarcrush", "grounding", "reddit", "messari"]
 
 QUICK_SOURCE_PRIORITY = {
     "factual": _BASE_PRIORITY,
@@ -85,6 +85,7 @@ SOURCE_LIMITS = {
 INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {}
 SOURCE_CAPABILITIES = {
     "x": {"discussion", "social"},
+    "reddit": {"discussion", "social"},
     "github": {"discussion", "link"},
     "grounding": {"web", "reference", "link"},
     "coingecko": {"crypto_data", "market"},
@@ -204,6 +205,7 @@ Crypto-specific source vocabulary:
 - ``lunarcrush``: social-quant — Galaxy Score, AltRank, sentiment %, top influencers, AI bull/bear themes.
 - ``x``: PRIMARY qualitative source — what crypto Twitter is actually saying right now. X is the canonical narrative source for this skill — every subquery should include it unless the topic is purely quant.
 - ``grounding``: web search (Serper/Exa/Brave/Parallel) for news, blog posts, governance docs, whitepapers — secondary supporting context only.
+- ``reddit``: tertiary community discussion — r/CryptoCurrency, r/ethfinance, r/solana, etc. Useful for retail sentiment, FUD/FOMO patterns, and longer-form discussions than X provides. Free, no API key.
 - ``github``: dev-activity for infra/L2/protocol topics (commits, PRs, issues) — tertiary, only when relevant to code-heavy topics.
 
 Intent rules:
@@ -436,7 +438,7 @@ def _fallback_plan(
                 label="reaction",
                 search_query=f"{base_search} reaction update",
                 ranking_query=f"What new reactions or follow-up reporting from the last 30 days matter for {topic}?",
-                sources=[source for source in source_weights if source in {"x", "grounding"}] or list(source_weights),
+                sources=[source for source in source_weights if source in {"x", "grounding", "reddit"}] or list(source_weights),
                 weight=0.7,
             )
         )
@@ -518,12 +520,14 @@ def _default_source_weights(intent: str, sources: list[str]) -> dict[str, float]
     # section. Their weights here just affect which subqueries the planner
     # prefers to issue.
     base = {source: 0.5 for source in sources}
-    # Massive X baseline: in a 3-source qualitative mix (x + grounding + github)
-    # this puts X at ~75% of qualitative weight.
+    # Massive X baseline: in a 4-source qualitative mix
+    # (x + grounding + reddit + github) this puts X at ~70% of qualitative weight.
     if "x" in base:
         base["x"] += 4.0
     if "grounding" in base:
         base["grounding"] += 0.4
+    if "reddit" in base:
+        base["reddit"] += 0.1
     if "github" in base:
         base["github"] += 0.2
     # Per-intent tilts. X stays dominant in every intent except crypto_data,

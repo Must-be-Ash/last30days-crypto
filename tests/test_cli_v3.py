@@ -91,17 +91,20 @@ class CliV3Tests(unittest.TestCase):
     def test_ensure_supported_python_allows_supported_interpreter(self):
         cli.ensure_supported_python((3, 12, 0))
 
-    def test_missing_sources_for_promo_prefers_x_then_web(self):
+    def test_missing_sources_for_promo_prefers_x_then_web_then_reddit(self):
+        # Only github → x + web + reddit all missing → "both" (>1 missing)
         self.assertEqual(
             "both",
             cli._missing_sources_for_promo({"available_sources": ["github"]}),
         )
+        # Has x and reddit → only web missing → "web"
         self.assertEqual(
             "web",
-            cli._missing_sources_for_promo({"available_sources": ["x"]}),
+            cli._missing_sources_for_promo({"available_sources": ["x", "reddit"]}),
         )
+        # Has all three → no promo
         self.assertIsNone(
-            cli._missing_sources_for_promo({"available_sources": ["x", "grounding"]}),
+            cli._missing_sources_for_promo({"available_sources": ["x", "grounding", "reddit"]}),
         )
 
     def test_slugify_and_emit_output_cover_supported_modes(self):

@@ -22,6 +22,17 @@ class TestHasBackend(unittest.TestCase):
         self.assertTrue(resolve._has_backend({"SERPER_API_KEY": "key"}))
 
 
+class TestExtractSubreddits(unittest.TestCase):
+    def test_extracts_from_text_and_url(self):
+        items = [
+            {"title": "r/CryptoCurrency thread", "snippet": "Also r/ethfinance", "url": "https://reddit.com/r/solana"},
+        ]
+        self.assertEqual(resolve._extract_subreddits(items), ["CryptoCurrency", "ethfinance", "solana"])
+
+    def test_empty_returns_empty(self):
+        self.assertEqual(resolve._extract_subreddits([]), [])
+
+
 class TestExtractXHandle(unittest.TestCase):
     def test_extracts_from_url(self):
         items = [
@@ -87,6 +98,7 @@ class TestBuildContextSummary(unittest.TestCase):
 class TestAutoResolve(unittest.TestCase):
     def test_no_backend_returns_empty(self):
         result = resolve.auto_resolve("test topic", {})
+        self.assertEqual(result["subreddits"], [])
         self.assertEqual(result["x_handle"], "")
         self.assertEqual(result["github_user"], "")
         self.assertEqual(result["context"], "")
@@ -95,6 +107,8 @@ class TestAutoResolve(unittest.TestCase):
     @patch("lib.resolve.grounding.web_search")
     def test_full_resolve(self, mock_search):
         def side_effect(query, date_range, config):
+            if "subreddit" in query:
+                return [{"title": "r/CryptoCurrency discussion", "snippet": "Also r/ethfinance", "url": ""}], {"label": "brave"}
             if "news" in query:
                 return [{"snippet": "Major tech breakthrough announced this week."}], {"label": "brave"}
             if "handle" in query:
@@ -108,10 +122,11 @@ class TestAutoResolve(unittest.TestCase):
         mock_search.side_effect = side_effect
         result = resolve.auto_resolve("tech", {"BRAVE_API_KEY": "fake"})
 
+        self.assertEqual(result["subreddits"], ["CryptoCurrency", "ethfinance"])
         self.assertEqual(result["x_handle"], "techco")
         self.assertIn("breakthrough", result["context"])
-        self.assertEqual(result["searches_run"], 3)
-        self.assertEqual(mock_search.call_count, 3)
+        self.assertEqual(result["searches_run"], 4)
+        self.assertEqual(mock_search.call_count, 4)
 
     @patch("lib.resolve.grounding.web_search")
     def test_search_failure_graceful(self, mock_search):
@@ -136,8 +151,8 @@ class TestAutoResolve(unittest.TestCase):
         result = resolve.auto_resolve("cooking", {"EXA_API_KEY": "fake"})
         # News search failed, so context is empty
         self.assertEqual(result["context"], "")
-        # 2 of 3 succeeded (handle + github; news failed)
-        self.assertEqual(result["searches_run"], 2)
+        # 3 of 4 succeeded (subreddit + handle + github; news failed)
+        self.assertEqual(result["searches_run"], 3)
 
 
 if __name__ == "__main__":

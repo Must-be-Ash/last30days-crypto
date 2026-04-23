@@ -11,6 +11,7 @@ from . import dates, relevance, schema
 SOURCE_QUALITY = {
     "x": 0.75,
     "grounding": 1.0,
+    "reddit": 0.6,
     "github": 0.8,
     "lunarcrush": 0.7,
     "coingecko": 0.9,
@@ -87,6 +88,16 @@ def _weighted_engagement(item: schema.SourceItem, weights: list[tuple[str, float
     return sum(v * w for v, w in values)
 
 
+def _reddit_engagement(item: schema.SourceItem) -> float | None:
+    score = log1p_safe(item.engagement.get("score"))
+    comments = log1p_safe(item.engagement.get("num_comments"))
+    ratio = float(item.engagement.get("upvote_ratio") or 0.0)
+    top_comment = _top_comment_score(item)
+    if not any([score, comments, ratio, top_comment]):
+        return None
+    return (0.50 * score) + (0.35 * comments) + (0.05 * (ratio * 10.0)) + (0.10 * top_comment)
+
+
 def _generic_engagement(item: schema.SourceItem) -> float | None:
     if not item.engagement:
         return None
@@ -97,6 +108,8 @@ def _generic_engagement(item: schema.SourceItem) -> float | None:
 
 
 def engagement_raw(item: schema.SourceItem) -> float | None:
+    if item.source == "reddit":
+        return _reddit_engagement(item)
     weights = ENGAGEMENT_WEIGHTS.get(item.source)
     if weights:
         return _weighted_engagement(item, weights)
@@ -139,7 +152,7 @@ def annotate_stream(
     return sorted(items, key=lambda item: item.local_rank_score or 0, reverse=True)
 
 
-_SOCIAL_SOURCES = {"x", "lunarcrush"}
+_SOCIAL_SOURCES = {"x", "reddit", "lunarcrush"}
 
 
 def _passes_engagement_floor(item: schema.SourceItem, sole_source: bool) -> bool:
