@@ -238,16 +238,8 @@ Web search (highly recommended — secondary qualitative source):
 Optional: Firecrawl (URL scraper):
 - `FIRECRAWL_API_KEY=xxx` — fallback for whitepapers, governance posts, deep blog content. Free tier at firecrawl.dev.
 
-Optional: Perplexity Sonar (AI-synthesized research via OpenRouter):
-- `OPENROUTER_API_KEY=xxx` — adds AI-synthesized crypto research with citations. ~$0.02/run.
-- After adding the key, set `INCLUDE_SOURCES=perplexity`.
-- Use `--deep-research` flag for exhaustive 50+ citation reports (~$0.90/query).
-
 Optional: GitHub Issues/PRs (free, no key needed):
 - If you have the `gh` CLI installed (`brew install gh`), GitHub search is automatic. Useful for protocol/infra topics. No API key required.
-
-Reddit (free, works out of the box):
-- Public JSON gives you threads + top comments. No setup required. Used as a tertiary qualitative source.
 
 Always add this last line: `SETUP_COMPLETE=true`
 
@@ -548,7 +540,7 @@ When the user asks "X vs Y", run ONE research pass with a comparison-optimized p
 
 **Single pass with entity-aware subqueries:**
 ```bash
-"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" "{TOPIC_A} vs {TOPIC_B}" --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3 --plan 'COMPARISON_PLAN_JSON' --x-handle={TOPIC_A_HANDLE} --x-related={TOPIC_B_HANDLE},{COMPANY_A_HANDLE},{COMPANY_B_HANDLE},{COMMENTATOR_HANDLES} --subreddits={RESOLVED_SUBREDDITS} --tiktok-hashtags={RESOLVED_HASHTAGS} --tiktok-creators={RESOLVED_TIKTOK_CREATORS} --ig-creators={RESOLVED_IG_CREATORS}
+"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" "{TOPIC_A} vs {TOPIC_B}" --deep --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3 --plan 'COMPARISON_PLAN_JSON' --x-handle={TOPIC_A_HANDLE} --x-related={TOPIC_B_HANDLE},{COMPANY_A_HANDLE},{COMPANY_B_HANDLE},{COMMENTATOR_HANDLES}
 ```
 
 **The `--plan` JSON for comparisons should include 3-4 subqueries:**
@@ -736,16 +728,14 @@ if [ -z "${SKILL_ROOT:-}" ]; then
   exit 1
 fi
 
-"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" $ARGUMENTS --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3
+"${LAST30DAYS_PYTHON}" "${SKILL_ROOT}/scripts/last30days.py" $ARGUMENTS --deep --emit=compact --save-dir=~/Documents/Last30Days-Crypto --save-suffix=v3
 ```
+
+**Why `--deep` is the default for this skill:** crypto research demands the full enrichment pass — Messari derivatives (open interest, funding rate, futures volume, volatility), LunarCrush time-series, and CoinGecko exchange/community data only run at `default` and `deep` depth. `--quick` skips them. Always invoke with `--deep` unless the user explicitly asks for a fast pass with `--quick` in their topic.
 
 **If you ran Steps 0.55 and 0.75 (agent planning), add these flags:**
 - `--plan 'QUERY_PLAN_JSON'` (replace with actual JSON from Step 0.75)
 - `--x-handle={RESOLVED_HANDLE}` (from Step 0.5)
-- `--subreddits={RESOLVED_SUBREDDITS}` (from Step 0.55)
-- `--tiktok-hashtags={RESOLVED_HASHTAGS}` (from Step 0.55)
-- `--tiktok-creators={RESOLVED_TIKTOK_CREATORS}` (from Step 0.55)
-- `--ig-creators={RESOLVED_IG_CREATORS}` (from Step 0.55)
 - `--github-user={RESOLVED_GITHUB_USER}` (from Step 0.5b, person topics only)
 - `--github-repo={RESOLVED_GITHUB_REPOS}` (from Step 0.5c, product/project topics only)
 - Omit any flag where the value was not resolved (empty).
@@ -811,9 +801,9 @@ For ALL query types:
 
 **Options** (passed through from user's command):
 - `--days=N` → Look back N days instead of 30 (e.g., `--days=7` for weekly roundup)
-- `--quick` → Faster, fewer sources (8-12 each)
-- (default) → Balanced (20-30 each)
-- `--deep` → Comprehensive (50-70 Reddit, 40-60 X)
+- `--quick` → Faster, fewer sources (8-12 each). **Skips Messari derivatives + LunarCrush time-series + CoinGecko exchange data.** Only use when the user explicitly asks for speed.
+- `--deep` → **Default for this skill.** Comprehensive crypto enrichment: Messari OI/funding/volume/volatility, LunarCrush time-series + posts, CoinGecko exchanges. ~40-60 X posts.
+- (script default `default` depth) → Balanced. Acceptable when `--deep` is too slow but still hits the full crypto enrichment pass.
 
 ---
 

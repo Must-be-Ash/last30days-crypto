@@ -196,11 +196,16 @@ def _missing_sources_for_promo(diag: dict[str, object]) -> str | None:
 
 def _show_runtime_ui(report: schema.Report, progress: ui.ProgressDisplay, diag: dict[str, object]) -> None:
     counts = {source: len(items) for source, items in report.items_by_source.items()}
+    # Crypto enrichment runs out-of-band so its bundles aren't in items_by_source.
+    # Surface them in the completion summary by counting per-source bundles.
+    for source, bundles in (report.crypto_enrichment or {}).items():
+        counts[source] = len([b for b in bundles if not b.get("error")])
     display_sources = list(
         dict.fromkeys(
             [
                 *report.query_plan.source_weights.keys(),
                 *report.items_by_source.keys(),
+                *(report.crypto_enrichment or {}).keys(),
                 *report.errors_by_source.keys(),
             ]
         )
